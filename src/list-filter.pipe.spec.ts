@@ -1,55 +1,15 @@
-import { ListFilterConfig, ListFilterPipe } from './list-filter.pipe';
+import { ListFilterPipe } from './list-filter.pipe';
+import { ListFilterConfig } from './list-filter-config';
+import { data } from './data';
+import { Subject } from 'rxjs';
 
 describe('list filter pipe', () => {
     let config: ListFilterConfig;
     let pipe: ListFilterPipe;
 
-    const list = [
-        {
-            name: '张三',
-            age: 12,
-            addr: {
-                street: '南京路',
-                code: '25号'
-            },
-            man: true,
-            loves: [ '苹果', '橘子' ]
-        },
-        {
-            name: '翠花',
-            age: 28,
-            addr: {
-                street: '北京路',
-                code: '1223号'
-            },
-            man: true,
-            loves: [ '苹果', '栗子', '桃子' ]
-        }
-    ];
-
     beforeEach(() => {
         config = new ListFilterConfig();
         pipe = new ListFilterPipe(config);
-    });
-
-    describe('测试 isPrimitive 方法', () => {
-        let caller: Function;
-
-        beforeEach(() => caller = spyOn(ListFilterPipe, 'isPrimitive').and.callThrough());
-
-        it('所有原始类型返回 true，其他返回 false', () => {
-            expect(caller.call(null, 1)).toBeTruthy();
-            expect(caller.call(null, 'any')).toBeTruthy();
-            expect(caller.call(null, null)).toBeTruthy();
-            expect(caller.call(null, undefined)).toBeTruthy();
-            expect(caller.call(null, false)).toBeTruthy();
-            expect(caller.call(null, Symbol())).toBeTruthy();
-            expect(caller.call(null, NaN)).toBeTruthy();
-
-            expect(caller.call(null, {})).toBeFalsy();
-            expect(caller.call(null, [])).toBeFalsy();
-            expect(caller.call(null, /any/)).toBeFalsy();
-        });
     });
 
     describe('测试 comparePrimitive 方法（srcProp 是原始类型）', () => {
@@ -118,28 +78,64 @@ describe('list filter pipe', () => {
         beforeEach(() => caller = spyOn(pipe, 'compareDeep'));
 
         it('filter 是原始类型', () => {
-            pipe.transform(list, 23);
+            pipe.transform(data, 23);
             expect(caller).toHaveBeenCalled();
         });
 
         it('filter 是只具有单个比较操作符的对象', () => {
-            pipe.transform(list, { '$gt': 1 });
+            pipe.transform(data, { '$gt': 1 });
             expect(caller).toHaveBeenCalled();
         });
 
         it('filter 是对象', () => {
-            pipe.transform(list, { age: 19 });
+            pipe.transform(data, { age: 19 });
             expect(caller).not.toHaveBeenCalled();
         });
 
         it('filter 是含多个比较操作符的对象', () => {
-            pipe.transform(list, { '$gt': 1, '$fullMatch': 'n' });
+            pipe.transform(data, { '$gt': 1, '$fullMatch': 'n' });
             expect(caller).not.toHaveBeenCalled();
         });
 
         it('filter 不是比较操作符', () => {
-            pipe.transform(list, { '$or': 1 });
+            pipe.transform(data, { '$or': 1 });
             expect(caller).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('filter 含有异步流测试', () => {
+        let filter: any;
+        let nameSubject: Subject<any>;
+        let ageSubject: Subject<any>;
+        let lovesSubject: Subject<any>;
+
+        beforeEach(() => {
+            nameSubject = new Subject();
+            ageSubject = new Subject();
+            lovesSubject = new Subject();
+
+            filter = {
+                //'$or': [
+                //    { name: nameSubject.asObservable() },
+                //    { age: ageSubject.asObservable() }
+                //],
+                loves: lovesSubject.asObservable()
+            };
+
+            filter = lovesSubject.asObservable();
+        });
+
+        it('', () => {
+            pipe.transform(data, filter).subscribe();
+            nameSubject.next('1');
+            ageSubject.next(2);
+            lovesSubject.next('a');
+
+            setTimeout(() => {
+                nameSubject.next('11');
+                ageSubject.next(22);
+                lovesSubject.next('aa');
+            }, 500);
         });
     });
 

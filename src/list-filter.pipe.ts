@@ -1,10 +1,11 @@
 import {
-    EventEmitter, Inject, Injectable, InjectionToken, OnDestroy, Optional, Pipe, PipeTransform
+    Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform
 } from '@angular/core';
-import { isBoolean, isSymbol } from 'util';
-import { merge, Observable, Subject, Subscription } from 'rxjs';
+import { combineLatest, merge, Observable, Subject, Subscription } from 'rxjs';
 import { debounceTime, defaultIfEmpty, finalize, map, startWith } from 'rxjs/operators';
-import { async2Observable } from 'cmjs-lib';
+import { async2Observable, uuid } from 'cmjs-lib';
+import { ListFilterConfig } from './list-filter-config';
+import { clone, isEmptyString, isNullOrUndefined, isObject, isPrimitive, isStringAndNumber } from './util';
 
 /**
  * 规则：
@@ -58,31 +59,6 @@ import { async2Observable } from 'cmjs-lib';
 
 export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_filter_config');
 
-export class ListFilterConfig {
-
-    // 异步流默认抖动时间
-    debounceTime?: number;
-
-    // 正则表达式默认标志
-    regFlags?: string;
-
-    // true 为严格比较(===)，false 为松比较(==)
-    // 严格比较时，若数据类型不一样，将忽略比较操作符，永远返回 false
-    strictMatch?: boolean;
-
-    // 是否开启数字转化为字符串。当数字同字符串匹配时有用，开启后数字可匹配局部数字
-    enableDigit2String?: boolean;
-
-    // 是否排除null
-    nullExclude?: boolean;
-
-    // 是否排除undefined
-    undefinedExclude?: boolean;
-
-    // 是否排除空字符串
-    emptyStringExclude?: boolean;
-}
-
 /**
  * 列表过滤，类似 mongodb 查询语法
  *
@@ -129,9 +105,9 @@ export class ListFilterPipe implements PipeTransform {
     }
 
     transform(list: any, filter: any) {
-        if (Array.isArray(list) && list.length && !ListFilterPipe.isNullOrUndefined(filter)) {
-            if (ListFilterPipe.isNullOrUndefined(this.asyncStreams)) {
-                // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本
+        if (Array.isArray(list) && list.length && !isNullOrUndefined(filter)) {
+            if (isNullOrUndefined(this.asyncStreams)) {
+                // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本，异步流会被特殊占位符替代
                 let [ asyncs, image ] = ListFilterPipe.getAsyncsAndCreateFilterImage(filter);
                 this.asyncStreams = asyncs;
                 this.filterImage = image;
@@ -139,19 +115,18 @@ export class ListFilterPipe implements PipeTransform {
 
             // 含有异步监听器
             if (this.asyncStreams.length) {
-                return merge(...this.asyncStreams).pipe(
-                    startWith(Symbol()),
-                    map((map: any) => {
-                        // 不是首值解析 filter 中异步流对应的值
-                        if (typeof map !== 'symbol') {
-                            return this.replaceFilterImage(map);
-                        }
-
-                        // 首值，全部异步流对应的值替换为空
-                        return this.replaceFilterImage();
-                    }),
+                return combineLatest(this.asyncStreams).pipe(
                     debounceTime(this.debounceTime),
-                    map((parsedFilter: any) => this.doTransform(list, parsedFilter))
+                    map((mapArray: any[]) => {
+                        let parsedFilter = clone(this.filterImage);
+
+                        // 替换异步流占位符为真实数据，形成最终真实 filter
+                        mapArray.forEach(map => {
+                            parsedFilter = ListFilterPipe.replaceFilterImageBak(parsedFilter, map);
+                        });
+
+                        return this.doTransform(list, parsedFilter);
+                    })
                 );
             } else {
                 return this.doTransform(list, filter);
@@ -168,7 +143,7 @@ export class ListFilterPipe implements PipeTransform {
          * 1.filter = primitive
          * 2.filter = { '$fullMatch': primitive }
          */
-        if (ListFilterPipe.isPrimitive(filter) || ListFilterPipe.isSinglePrimitiveObject(filter)) {
+        if (isPrimitive(filter) || ListFilterPipe.isSinglePrimitiveObject(filter)) {
             return list.filter((src: any) => this.compareDeep(src, filter));
         }
     }
@@ -178,13 +153,13 @@ export class ListFilterPipe implements PipeTransform {
             return !this.nullExclude;
         } else if (srcProp === undefined) {
             return !this.undefinedExclude;
-        } else if (ListFilterPipe.isEmptyString(srcProp)) {
+        } else if (isEmptyString(srcProp)) {
             return !this.emptyStringExclude;
         }
 
-        if (ListFilterPipe.isPrimitive(filterProp)) {
+        if (isPrimitive(filterProp)) {
             if (
-                (this.enableDigit2String && ListFilterPipe.isStringAndNumber(srcProp, filterProp))
+                (this.enableDigit2String && isStringAndNumber(srcProp, filterProp))
                 || (typeof srcProp === 'string' && typeof filterProp === 'string')) {
                 return new RegExp(filterProp, this.regFlags || '').test(srcProp);
             } else {
@@ -205,11 +180,11 @@ export class ListFilterPipe implements PipeTransform {
     }
 
     private compareDeep(srcProp: any, filterProp: any) {
-        if (ListFilterPipe.isPrimitive(srcProp)) {
+        if (isPrimitive(srcProp)) {
             return this.comparePrimitive(srcProp, filterProp);
         } else if (Array.isArray(srcProp)) {
 
-        } else if (ListFilterPipe.isObject(srcProp)) {
+        } else if (isObject(srcProp)) {
 
         }
     }
@@ -376,20 +351,18 @@ export class ListFilterPipe implements PipeTransform {
 
    */
 
-    /* 内部处理方法 */
-
     private static getAsyncsAndCreateFilterImage(obj: any) {
         let asyncs: Array<Observable<any>> = [];
         let image: any;
 
-        if (this.isObject(obj)) {
+        if (isObject(obj) && !(obj instanceof Promise || obj instanceof Observable)) {
             image = {};
 
             for (let k of Object.keys(obj)) {
                 if (obj[ k ] instanceof Promise || obj[ k ] instanceof Observable) {
-                    image[ k ] = Symbol();
-                    asyncs.push(async2Observable(obj[ k ]).pipe(map(v => ({ key: image[ k ], value: v }))));
-                } else if (this.isObject(obj[ k ]) || Array.isArray(obj[ k ])) {
+                    image[ k ] = this.generateKey();
+                    asyncs.push(this.generateObservable(obj[ k ], image[ k ]));
+                } else if (isObject(obj[ k ]) || Array.isArray(obj[ k ])) {
                     let [ asyncsOuter, imageOuter ] = this.getAsyncsAndCreateFilterImage(obj[ k ]);
                     image[ k ] = imageOuter;
                     asyncs.push(...asyncsOuter);
@@ -402,10 +375,10 @@ export class ListFilterPipe implements PipeTransform {
 
             for (let v of obj) {
                 if (v instanceof Promise || v instanceof Observable) {
-                    let k = Symbol();
+                    let k = this.generateKey();
                     image.push(k);
-                    asyncs.push(async2Observable(v).pipe(map(v => ({ key: k, value: v }))));
-                } else if (this.isObject(v) || Array.isArray(v)) {
+                    asyncs.push(this.generateObservable(v, k));
+                } else if (isObject(v) || Array.isArray(v)) {
                     let [ asyncsOuter, imageOuter ] = this.getAsyncsAndCreateFilterImage(v);
                     image.push(imageOuter);
                     asyncs.push(...asyncsOuter);
@@ -415,8 +388,8 @@ export class ListFilterPipe implements PipeTransform {
             }
         } else {
             if (obj instanceof Promise || obj instanceof Observable) {
-                image = Symbol();
-                asyncs.push(async2Observable(obj).pipe(map(v => ({ key: image, value: v }))));
+                image = this.generateKey();
+                asyncs.push(this.generateObservable(obj, image));
             } else {
                 image = obj;
             }
@@ -425,48 +398,45 @@ export class ListFilterPipe implements PipeTransform {
         return [ asyncs, image ];
     }
 
-    private replaceFilterImage(map?: { key: Symbol, value: any }) {
-        if (ListFilterPipe.isNullOrUndefined(map)) {
-            if (ListFilterPipe.isObject(this.filterImage)) {
+    private static generateKey() {
+        return '__' + uuid(8) + '__';
+    }
 
-            } else if (Array.isArray(this.filterImage)) {
+    private static generateObservable(stream: Observable<any> | Promise<any>, key: string) {
+        return async2Observable(stream).pipe(
+            startWith(null),
+            map(value => ({ key, value }))
+        );
+    }
 
+    private static replaceFilterImageBak(target: any, map: { key: string, value: any }) {
+        if (isObject(target)) {
+            for (let k of Object.keys(target)) {
+                if (target[ k ] === map.key) {
+                    target[ k ] = map.value;
+                } else if (isObject(target[ k ]) || Array.isArray(target[ k ])) {
+                    this.replaceFilterImageBak(target[ k ], map);
+                }
             }
-        } else {
-
+        } else if (Array.isArray(target)) {
+            for (let i = 0, len = target.length; i < len; i++) {
+                if (target[ i ] === map.key) {
+                    target[ i ] = map.value;
+                } else if (isObject(target[ i ]) || Array.isArray(target[ i ])) {
+                    this.replaceFilterImageBak(target[ i ], map);
+                }
+            }
+        } else if (target === map.key) {
+            return map.value;
         }
-    }
 
-    /* 类型判断 */
-
-    private static getType(v: any) {
-        return Object.prototype.toString.call(v);
-    }
-
-    private static isObject(v: any) {
-        return this.getType(v) === '[object Object]';
-    }
-
-    private static isNullOrUndefined(v: any) {
-        return v === null || v === undefined;
-    }
-
-    private static isPrimitive(v: any) {
-        return (typeof v !== 'object' && typeof v !== 'function') || v === null;
+        return target;
     }
 
     private static isSinglePrimitiveObject(v: any) {
-        return this.isObject(v)
+        return isObject(v)
             && Object.keys(v).length === 1
             && this.COMPARE_OPERATORS.indexOf(Object.keys(v)[ 0 ].toLowerCase()) >= 0;
-    }
-
-    private static isEmptyString(v: any) {
-        return typeof v === 'string' && v.trim().length === 0;
-    }
-
-    private static isStringAndNumber(a: any, b: any) {
-        return (typeof a === 'string' && typeof b === 'number') || (typeof a === 'number' && typeof b === 'string');
     }
 
 }
