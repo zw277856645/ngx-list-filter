@@ -1,7 +1,5 @@
 import { ListFilterPipe } from './list-filter.pipe';
 import { ListFilterConfig } from './list-filter-config';
-import { data } from './data';
-import { Subject } from 'rxjs';
 
 describe('list filter pipe', () => {
     let config: ListFilterConfig;
@@ -72,70 +70,35 @@ describe('list filter pipe', () => {
         });
     });
 
-    describe('filter 是原始类型，执行 compareDeep 方法', () => {
-        let caller: Function;
+    describe('数据测试', () => {
+        describe('srcProp 是原始类型，filterProp 是原始类型', () => {
+            let data: any[];
 
-        beforeEach(() => caller = spyOn(pipe, 'compareDeep'));
+            beforeEach(() => data = [ undefined, null, '', 12, '12', false, true ]);
 
-        it('filter 是原始类型', () => {
-            pipe.transform(data, 23);
-            expect(caller).toHaveBeenCalled();
-        });
+            it('非严格模式，排除空值，允许数字转字符串', () => {
+                expect(pipe.transform(data, 2)).toEqual([ '12' ]);
+                expect(pipe.transform(data, '2')).toEqual([ 12, '12' ]);
+                expect(pipe.transform(data, 0)).toEqual([ false ]);
+                expect(pipe.transform(data, 1)).toEqual([ '12', true ]);
+            });
 
-        it('filter 是只具有单个比较操作符的对象', () => {
-            pipe.transform(data, { '$gt': 1 });
-            expect(caller).toHaveBeenCalled();
-        });
+            describe('严格模式，包含空值，禁止数字转字符串', () => {
+                beforeEach(() => {
+                    pipe.strictMatch = true;
+                    pipe.nullExclude = false;
+                    pipe.undefinedExclude = false;
+                    pipe.emptyStringExclude = false;
+                    pipe.enableDigit2String = false;
+                });
 
-        it('filter 是对象', () => {
-            pipe.transform(data, { age: 19 });
-            expect(caller).not.toHaveBeenCalled();
-        });
-
-        it('filter 是含多个比较操作符的对象', () => {
-            pipe.transform(data, { '$gt': 1, '$fullMatch': 'n' });
-            expect(caller).not.toHaveBeenCalled();
-        });
-
-        it('filter 不是比较操作符', () => {
-            pipe.transform(data, { '$or': 1 });
-            expect(caller).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('filter 含有异步流测试', () => {
-        let filter: any;
-        let nameSubject: Subject<any>;
-        let ageSubject: Subject<any>;
-        let lovesSubject: Subject<any>;
-
-        beforeEach(() => {
-            nameSubject = new Subject();
-            ageSubject = new Subject();
-            lovesSubject = new Subject();
-
-            filter = {
-                //'$or': [
-                //    { name: nameSubject.asObservable() },
-                //    { age: ageSubject.asObservable() }
-                //],
-                loves: lovesSubject.asObservable()
-            };
-
-            filter = lovesSubject.asObservable();
-        });
-
-        it('', () => {
-            pipe.transform(data, filter).subscribe();
-            nameSubject.next('1');
-            ageSubject.next(2);
-            lovesSubject.next('a');
-
-            setTimeout(() => {
-                nameSubject.next('11');
-                ageSubject.next(22);
-                lovesSubject.next('aa');
-            }, 500);
+                it('相同数据测试', () => {
+                    expect(pipe.transform(data, 2)).toEqual([ undefined, null, '' ]);
+                    expect(pipe.transform(data, '2')).toEqual([ undefined, null, '', '12' ]);
+                    expect(pipe.transform(data, 0)).toEqual([ undefined, null, '' ]);
+                    expect(pipe.transform(data, 1)).toEqual([ undefined, null, '' ]);
+                });
+            });
         });
     });
 

@@ -2,8 +2,8 @@ import {
     Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform
 } from '@angular/core';
 import { combineLatest, merge, Observable, Subject, Subscription } from 'rxjs';
-import { debounceTime, defaultIfEmpty, finalize, map, startWith } from 'rxjs/operators';
-import { async2Observable, uuid } from 'cmjs-lib';
+import { debounceTime, defaultIfEmpty, finalize, map, shareReplay, startWith } from 'rxjs/operators';
+import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
 import { clone, isEmptyString, isNullOrUndefined, isObject, isPrimitive, isStringAndNumber } from './util';
 
@@ -120,7 +120,10 @@ export class ListFilterPipe implements PipeTransform {
                     map((mapArray: any[]) => {
                         let parsedFilter = clone(this.filterImage);
 
-                        // 替换异步流占位符为真实数据，形成最终真实 filter
+                        // 继承非异步流参数
+                        parsedFilter = ListFilterPipe.extendStaticParams(parsedFilter, filter);
+
+                        // 异步流占位符替换为真实数据
                         mapArray.forEach(map => {
                             parsedFilter = ListFilterPipe.replaceFilterImageBak(parsedFilter, map);
                         });
@@ -145,6 +148,18 @@ export class ListFilterPipe implements PipeTransform {
          */
         if (isPrimitive(filter) || ListFilterPipe.isSinglePrimitiveObject(filter)) {
             return list.filter((src: any) => this.compareDeep(src, filter));
+        }
+
+        return list;
+    }
+
+    private compareDeep(srcProp: any, filterProp: any) {
+        if (isPrimitive(srcProp)) {
+            return this.comparePrimitive(srcProp, filterProp);
+        } else if (Array.isArray(srcProp)) {
+
+        } else if (isObject(srcProp)) {
+
         }
     }
 
@@ -175,16 +190,6 @@ export class ListFilterPipe implements PipeTransform {
 
             }
         } else {
-
-        }
-    }
-
-    private compareDeep(srcProp: any, filterProp: any) {
-        if (isPrimitive(srcProp)) {
-            return this.comparePrimitive(srcProp, filterProp);
-        } else if (Array.isArray(srcProp)) {
-
-        } else if (isObject(srcProp)) {
 
         }
     }
@@ -405,8 +410,17 @@ export class ListFilterPipe implements PipeTransform {
     private static generateObservable(stream: Observable<any> | Promise<any>, key: string) {
         return async2Observable(stream).pipe(
             startWith(null),
-            map(value => ({ key, value }))
+            map(value => ({ key, value })),
+            shareReplay(1)
         );
+    }
+
+    private static extendStaticParams(target: any, src: any) {
+        if (src instanceof Promise || src instanceof Observable) {
+            return target;
+        }
+
+        return deepExtend(src, target);
     }
 
     private static replaceFilterImageBak(target: any, map: { key: string, value: any }) {
