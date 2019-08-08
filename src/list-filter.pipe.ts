@@ -5,7 +5,7 @@ import { combineLatest, merge, Observable, Subject, Subscription } from 'rxjs';
 import { debounceTime, defaultIfEmpty, finalize, map, shareReplay, startWith } from 'rxjs/operators';
 import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
-import { clone, isEmptyString, isNullOrUndefined, isObject, isPrimitive, isStringAndNumber } from './util';
+import { clone, isEmpty, isEmptyString, isNullOrUndefined, isObject, isPrimitive, isStringAndNumber } from './util';
 
 /**
  * 规则：
@@ -86,15 +86,22 @@ export class ListFilterPipe implements PipeTransform {
     // 默认配置，可被全局配置覆盖
     debounceTime: number = 400;
     regFlags: string = 'i';
+    fullMatchRegFlags: string = 'i';
     strictMatch = false;
     enableDigit2String = true;
     nullExclude = true;
     undefinedExclude = true;
     emptyStringExclude = true;
 
+    // 原始类型比较操作符 - 单个值
+    private static readonly SINGLE_COMPARE_OPERATORS = [ '$fullMatch', '$lt', '$lte', '$gt', '$gte' ];
+
+    // 原始类型比较操作符 - 数组
+    private static readonly ARRAY_COMPARE_OPERATORS = [ '$in', '$nin', '$range' ];
+
     // 原始类型比较操作符
     private static readonly COMPARE_OPERATORS = [
-        '$fullMatch', '$lt', '$lte', '$gt', '$gte', '$in', '$nin', '$range'
+        ...ListFilterPipe.SINGLE_COMPARE_OPERATORS, ...ListFilterPipe.ARRAY_COMPARE_OPERATORS
     ];
 
     private asyncStreams: Array<Observable<any>>;
@@ -105,7 +112,7 @@ export class ListFilterPipe implements PipeTransform {
     }
 
     transform(list: any, filter: any) {
-        if (Array.isArray(list) && list.length && !isNullOrUndefined(filter)) {
+        if (Array.isArray(list) && list.length && !isEmpty(filter)) {
             if (isNullOrUndefined(this.asyncStreams)) {
                 // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本，异步流会被特殊占位符替代
                 let [ asyncs, image ] = ListFilterPipe.getAsyncsAndCreateFilterImage(filter);
@@ -175,22 +182,60 @@ export class ListFilterPipe implements PipeTransform {
         if (isPrimitive(filterProp)) {
             if (
                 (this.enableDigit2String && isStringAndNumber(srcProp, filterProp))
-                || (typeof srcProp === 'string' && typeof filterProp === 'string')) {
-                return new RegExp(filterProp, this.regFlags || '').test(srcProp);
+                || (typeof srcProp === 'string' && typeof filterProp === 'string')
+            ) {
+                return new RegExp(String(filterProp).trim(), this.regFlags || '').test(srcProp);
             } else {
                 return this.strictMatch ? srcProp === filterProp : srcProp == filterProp;
             }
-        } else if (ListFilterPipe.isSinglePrimitiveObject(filterProp)) {
+        } else {
             let operator = Object.keys(filterProp)[ 0 ];
-            let filterValue = filterProp[ operator ];
+            let value = filterProp[ operator ];
 
-            if (this.strictMatch && (typeof srcProp !== typeof filterValue)) {
+            // 忽略不符合使用规则的情况
+            if (isObject(value)
+                || (!isPrimitive(value) && ListFilterPipe.SINGLE_COMPARE_OPERATORS.indexOf(operator) >= 0)
+                || (!Array.isArray(value) && ListFilterPipe.ARRAY_COMPARE_OPERATORS.indexOf(operator) >= 0)) {
+                return true;
+            }
+
+            if (isEmpty(value)) {
+                return true;
+            } else if (this.strictMatch && (typeof srcProp !== typeof value)) {
                 return false;
             } else {
-
+                try {
+                    switch (operator) {
+                        case '$fullMatch':
+                            if (
+                                (this.enableDigit2String && isStringAndNumber(srcProp, value))
+                                || (typeof srcProp === 'string' && typeof value === 'string')
+                            ) {
+                                return new RegExp(`^\\s*${String(value).trim()}\\s*$`, this.fullMatchRegFlags || '')
+                                    .test(srcProp);
+                            } else {
+                                return this.strictMatch ? srcProp === value : srcProp == value;
+                            }
+                        case '$lt':
+                            return srcProp < value;
+                        case  '$lte':
+                            return srcProp <= value;
+                        case '$gt':
+                            return srcProp > value;
+                        case '$gte':
+                            return srcProp >= value;
+                        case '$in':
+                            return (value as any[]).indexOf(srcProp) >= 0;
+                        case '$nin':
+                            return (value as any[]).indexOf(srcProp) < 0;
+                        case '$range':
+                            return srcProp >= value[ 0 ] && srcProp <= value[ 1 ];
+                    }
+                } catch (e) {
+                    // 某些类型不能自动转化的比较会抛异常，比如 1 < Symbol()，此类情形不处理返回 true
+                    return true;
+                }
             }
-        } else {
-
         }
     }
 

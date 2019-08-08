@@ -1,9 +1,5 @@
-export function getType(v: any) {
-    return Object.prototype.toString.call(v);
-}
-
 export function isObject(v: any) {
-    return getType(v) === '[object Object]';
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 export function isNullOrUndefined(v: any) {
@@ -16,6 +12,10 @@ export function isPrimitive(v: any) {
 
 export function isEmptyString(v: any) {
     return typeof v === 'string' && v.trim().length === 0;
+}
+
+export function isEmpty(v: any) {
+    return isNullOrUndefined(v) || isEmptyString(v);
 }
 
 export function isStringAndNumber(a: any, b: any) {

@@ -68,6 +68,74 @@ describe('list filter pipe', () => {
                 });
             });
         });
+
+        describe('filterProp 只有一个比较操作符的对象', () => {
+            it('值为不符合使用规则的情况，返回 true', () => {
+                expect(caller.call(pipe, {}, { '$lt': {} })).toBeTruthy();
+                expect(caller.call(pipe, {}, { '$lt': [] })).toBeTruthy();
+                expect(caller.call(pipe, {}, { '$in': 1 })).toBeTruthy();
+            });
+
+            it('值为空，返回 true', () => {
+                expect(caller.call(pipe, {}, { '$lt': null })).toBeTruthy();
+                expect(caller.call(pipe, {}, { '$lt': undefined })).toBeTruthy();
+                expect(caller.call(pipe, {}, { '$lt': '' })).toBeTruthy();
+            });
+
+            describe('严格模式', () => {
+                beforeEach(() => pipe.strictMatch = true);
+
+                it('类型不同，返回 false', () => {
+                    expect(caller.call(pipe, 1, { '$lt': true })).toBeFalsy();
+                    expect(caller.call(pipe, 1, { '$lt': '1' })).toBeFalsy();
+                });
+            });
+
+            describe('其他情况根据操作符比较', () => {
+                describe('$fullMatch', () => {
+                    it('enableDigit2String = true & 数字和字符串或字符串和字符串', () => {
+                        expect(caller.call(pipe, 12, { '$fullMatch': '1' })).toBeFalsy();
+                        expect(caller.call(pipe, ' 12 ', { '$fullMatch': 12 })).toBeTruthy();
+                        expect(caller.call(pipe, 12, { '$fullMatch': ' 12 ' })).toBeTruthy();
+                        expect(caller.call(pipe, 'abc', { '$fullMatch': 'AbC' })).toBeTruthy();
+                    });
+
+                    it('比较对象不是字符串和数字时，退化为 === 或 == 比较，由 strictMatch 配置决定', () => {
+                        expect(caller.call(pipe, 1, { '$fullMatch': true })).toBeTruthy();
+                        expect(caller.call(pipe, 0, '0')).toBeTruthy();
+                    });
+                });
+
+                it('$lt / $gt', () => {
+                    expect(caller.call(pipe, 5, { '$lt': 7 })).toBeTruthy();
+                    expect(caller.call(pipe, 5, { '$lt': '7' })).toBeTruthy();
+                    expect(caller.call(pipe, 5, { '$lt': 5 })).toBeFalsy();
+                    expect(caller.call(pipe, 0, { '$lt': true })).toBeTruthy();
+                });
+
+                it('$lte / $gte', () => {
+                    expect(caller.call(pipe, 5, { '$lte': 5 })).toBeTruthy();
+                    expect(caller.call(pipe, 5, { '$lte': 4 })).toBeFalsy();
+                });
+
+                it('$in / $nin', () => {
+                    expect(caller.call(pipe, 5, { '$in': [ 3, 5, 8 ] })).toBeTruthy();
+                    expect(caller.call(pipe, 5, { '$in': [ 9, 10 ] })).toBeFalsy();
+
+                    expect(caller.call(pipe, 5, { '$nin': [ 3, 5, 8 ] })).toBeFalsy();
+                    expect(caller.call(pipe, 5, { '$nin': [ 9, 10 ] })).toBeTruthy();
+                });
+
+                it('$range', () => {
+                    expect(caller.call(pipe, 5, { '$range': [ 5, 10 ] })).toBeTruthy();
+                    expect(caller.call(pipe, 5, { '$range': [ 8, 10 ] })).toBeFalsy();
+                });
+
+                it('无法比较抛异常的情况返回 true', () => {
+                    expect(caller.call(pipe, 5, { '$lt': Symbol() })).toBeTruthy();
+                });
+            });
+        });
     });
 
     describe('数据测试', () => {

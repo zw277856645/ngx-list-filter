@@ -3,8 +3,11 @@ export class ListFilterConfig {
     // 异步流默认抖动时间
     debounceTime?: number;
 
-    // 正则表达式默认标志
+    // 部分匹配正则表达式默认标志
     regFlags?: string;
+
+    // 完全匹配正则表达式默认标志
+    fullMatchRegFlags?: string;
 
     // true 为严格比较(===)，false 为松比较(==)
     // 严格比较时，若数据类型不一样，将忽略比较操作符，永远返回 false
