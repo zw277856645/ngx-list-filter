@@ -1,11 +1,10 @@
-import {
-    Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform
-} from '@angular/core';
-import { combineLatest, merge, Observable, Subject, Subscription } from 'rxjs';
-import { debounceTime, defaultIfEmpty, finalize, map, shareReplay, startWith } from 'rxjs/operators';
+import { Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform } from '@angular/core';
+import { combineLatest, Observable } from 'rxjs';
+import { debounceTime, map, shareReplay, startWith } from 'rxjs/operators';
 import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
-import { clone, isEmpty, isEmptyString, isNullOrUndefined, isObject, isPrimitive, isStringAndNumber } from './util';
+import { clone, isEmpty, isNullOrUndefined, isObject, valueGetter } from './util';
+import { LogicOperatorHandler } from './logic-operator-handler';
 
 /**
  * 规则：
@@ -65,12 +64,12 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
  * 支持功能：
  * 01）全局参数配置
  * 02）支持异步流 Promise/Observable/EventEmitter，并增加 debounceTime
- * 03）与，或($or)
- * 04）字符串默认是正则匹配，如需全等比较，使用 $fullMatch
- * 05）<($lt)，<=($lte)，>($gt)，>=($gte)
+ * 03）与($and)，或($or)，非或($nor)，非($not)
+ * 04）<($lt)，<=($lte)，>($gt)，>=($gte)
+ * 05）
  * 06）在指定范围之内($in)，不在指定范围之内($nin)
  * 07）范围($range)
- * 08）数组包含指定值(string)，全部包含($all)，包含任意一个($any)
+ * 08）数组包含指定值，全部包含($all)，包含任意一个($any)
  * 09）数组个数值或个数范围($size)
  * 10）数组内对象匹配($elemMatch)
  * 11）嵌入对象匹配，使用点记法(a.b.c)
@@ -83,32 +82,16 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
 })
 export class ListFilterPipe implements PipeTransform {
 
-    // 默认配置，可被全局配置覆盖
     debounceTime: number = 400;
-    regFlags: string = 'i';
-    fullMatchRegFlags: string = 'i';
-    strictMatch = false;
-    enableDigit2String = true;
-    nullExclude = true;
-    undefinedExclude = true;
-    emptyStringExclude = true;
-
-    // 原始类型比较操作符 - 单个值
-    private static readonly SINGLE_COMPARE_OPERATORS = [ '$fullMatch', '$lt', '$lte', '$gt', '$gte' ];
-
-    // 原始类型比较操作符 - 数组
-    private static readonly ARRAY_COMPARE_OPERATORS = [ '$in', '$nin', '$range' ];
-
-    // 原始类型比较操作符
-    private static readonly COMPARE_OPERATORS = [
-        ...ListFilterPipe.SINGLE_COMPARE_OPERATORS, ...ListFilterPipe.ARRAY_COMPARE_OPERATORS
-    ];
+    valueGetter = valueGetter;
 
     private asyncStreams: Array<Observable<any>>;
     private filterImage: any;
+    private logicHandler: LogicOperatorHandler;
 
     constructor(@Optional() @Inject(LIST_FILTER_CONFIG) config: ListFilterConfig) {
         Object.assign(this, config);
+        this.logicHandler = new LogicOperatorHandler(this.valueGetter);
     }
 
     transform(list: any, filter: any) {
@@ -135,271 +118,16 @@ export class ListFilterPipe implements PipeTransform {
                             parsedFilter = ListFilterPipe.replaceFilterImageBak(parsedFilter, map);
                         });
 
-                        return this.doTransform(list, parsedFilter);
+                        return this.logicHandler.match(list, parsedFilter);
                     })
                 );
             } else {
-                return this.doTransform(list, filter);
+                return this.logicHandler.match(list, filter);
             }
         }
 
         return list;
     }
-
-    private doTransform(list: any, filter: any) {
-        /**
-         * filter 是原始类型，深度匹配所有属性
-         *
-         * 1.filter = primitive
-         * 2.filter = { '$fullMatch': primitive }
-         */
-        if (isPrimitive(filter) || ListFilterPipe.isSinglePrimitiveObject(filter)) {
-            return list.filter((src: any) => this.compareDeep(src, filter));
-        }
-
-        return list;
-    }
-
-    private compareDeep(srcProp: any, filterProp: any) {
-        if (isPrimitive(srcProp)) {
-            return this.comparePrimitive(srcProp, filterProp);
-        } else if (Array.isArray(srcProp)) {
-
-        } else if (isObject(srcProp)) {
-
-        }
-    }
-
-    private comparePrimitive(srcProp: any, filterProp: any) {
-        if (srcProp === null) {
-            return !this.nullExclude;
-        } else if (srcProp === undefined) {
-            return !this.undefinedExclude;
-        } else if (isEmptyString(srcProp)) {
-            return !this.emptyStringExclude;
-        }
-
-        if (isPrimitive(filterProp)) {
-            if (
-                (this.enableDigit2String && isStringAndNumber(srcProp, filterProp))
-                || (typeof srcProp === 'string' && typeof filterProp === 'string')
-            ) {
-                return new RegExp(String(filterProp).trim(), this.regFlags || '').test(srcProp);
-            } else {
-                return this.strictMatch ? srcProp === filterProp : srcProp == filterProp;
-            }
-        } else {
-            let operator = Object.keys(filterProp)[ 0 ];
-            let value = filterProp[ operator ];
-
-            // 忽略不符合使用规则的情况
-            if (isObject(value)
-                || (!isPrimitive(value) && ListFilterPipe.SINGLE_COMPARE_OPERATORS.indexOf(operator) >= 0)
-                || (!Array.isArray(value) && ListFilterPipe.ARRAY_COMPARE_OPERATORS.indexOf(operator) >= 0)) {
-                return true;
-            }
-
-            if (isEmpty(value)) {
-                return true;
-            } else if (this.strictMatch && (typeof srcProp !== typeof value)) {
-                return false;
-            } else {
-                try {
-                    switch (operator) {
-                        case '$fullMatch':
-                            if (
-                                (this.enableDigit2String && isStringAndNumber(srcProp, value))
-                                || (typeof srcProp === 'string' && typeof value === 'string')
-                            ) {
-                                return new RegExp(`^\\s*${String(value).trim()}\\s*$`, this.fullMatchRegFlags || '')
-                                    .test(srcProp);
-                            } else {
-                                return this.strictMatch ? srcProp === value : srcProp == value;
-                            }
-                        case '$lt':
-                            return srcProp < value;
-                        case  '$lte':
-                            return srcProp <= value;
-                        case '$gt':
-                            return srcProp > value;
-                        case '$gte':
-                            return srcProp >= value;
-                        case '$in':
-                            return (value as any[]).indexOf(srcProp) >= 0;
-                        case '$nin':
-                            return (value as any[]).indexOf(srcProp) < 0;
-                        case '$range':
-                            return srcProp >= value[ 0 ] && srcProp <= value[ 1 ];
-                    }
-                } catch (e) {
-                    // 某些类型不能自动转化的比较会抛异常，比如 1 < Symbol()，此类情形不处理返回 true
-                    return true;
-                }
-            }
-        }
-    }
-
-    /*transform(list: any, filter: any, logic: 'or' | 'and' = 'or') {
-       if (Array.isArray(list) && !ListFilterPipe.isNullOrUndefined(filter)) {
-           return list.filter((v: any) => ListFilterPipe.compareAnys(v, filter, logic));
-       }
-
-       return list;
-   }
-
-   private static compareAnys(v: any, filter: any, logic: any) {
-       if (ListFilterPipe.isNullOrUndefined(v)) {
-           return false;
-       } else if (ListFilterPipe.isPrimitive(v)) {
-           if (ListFilterPipe.isNullOrUndefined(filter)) {
-               return true;
-           } else if (ListFilterPipe.isPrimitive(filter)) {
-               return ListFilterPipe.comparePrimitives(v, filter);
-           } else if (isRealObject(filter)) {
-               return true;
-           } else if (Array.isArray(filter)) {
-               return ListFilterPipe.comparePrimitiveAndArray(filter, v);
-           }
-       } else if (isRealObject(v)) {
-           if (ListFilterPipe.isNullOrUndefined(filter)) {
-               return true;
-           } else if (ListFilterPipe.isPrimitive(filter)) {
-               return ListFilterPipe.comparePrimitiveAndObjectDeep(v, filter);
-           } else if (isRealObject(filter)) {
-               return ListFilterPipe.compareObjects(v, filter, logic);
-           } else if (Array.isArray(filter)) {
-               return true;
-           }
-       } else if (Array.isArray(v)) {
-           if (ListFilterPipe.isNullOrUndefined(filter)) {
-               return true;
-           } else if (ListFilterPipe.isPrimitive(filter)) {
-               return ListFilterPipe.comparePrimitiveAndArray(v, filter);
-           } else if (isRealObject(filter)) {
-               return true;
-           } else if (Array.isArray(filter)) {
-               return ListFilterPipe.compareArrays(v, filter);
-           }
-       }
-
-       return v === filter;
-   }
-
-   private static comparePrimitives(src: any, tar: any, fullMatch: boolean = false): boolean {
-       if (!fullMatch && typeof src === 'string' && typeof tar === 'string') {
-           return src.toLowerCase().includes(tar.toLowerCase());
-       }
-
-       return src === tar;
-   }
-
-   private static comparePrimitiveAndObjectDeep(obj: { [ k: string ]: any }, primitive: any): boolean {
-       let value;
-       for (let v in obj) {
-           value = obj[ v ];
-
-           if (ListFilterPipe.isNullOrUndefined(value)) {
-               continue;
-           }
-           if (ListFilterPipe.isPrimitive(value) && this.comparePrimitives(value, primitive)) {
-               return true;
-           }
-           if (isRealObject(value) && this.comparePrimitiveAndObjectDeep(value, primitive)) {
-               return true;
-           }
-           if (Array.isArray(value) && this.comparePrimitiveAndArrayDeep(value, primitive)) {
-               return true;
-           }
-       }
-
-       return false;
-   }
-
-   private static comparePrimitiveAndArray(array: any[], primitive: any): boolean {
-       return array.length > 0 ? array.indexOf(primitive) >= 0 : true;
-   }
-
-   private static comparePrimitiveAndArrayDeep(array: any[], primitive: any): boolean {
-       for (let value of array) {
-           if (ListFilterPipe.isNullOrUndefined(value)) {
-               continue;
-           }
-           if (ListFilterPipe.isPrimitive(value) && this.comparePrimitives(value, primitive, true)) {
-               return true;
-           }
-           if (isRealObject(value) && this.comparePrimitiveAndObjectDeep(value, primitive)) {
-               return true;
-           }
-           if (Array.isArray(value) && this.comparePrimitiveAndArrayDeep(value, primitive)) {
-               return true;
-           }
-       }
-
-       return false;
-   }
-
-   private static compareObjects(src: { [ k: string ]: any }, tar: { [ k: string ]: any }, logic: any): boolean {
-       if (logic === 'or') {
-           let emptyNum = 0, allNum = 0;
-           for (let k in tar) {
-               allNum++;
-               if (ListFilterPipe.isNullOrUndefined(src[ k ]) || ListFilterPipe.isNullOrUndefined(tar[ k ])
-                   || isEmptyArray(src[ k ]) || isEmptyArray(tar[ k ])) {
-                   emptyNum++;
-                   continue;
-               }
-               if ((k in src) && this.compareAnys(src[ k ], tar[ k ], logic)) {
-                   return true;
-               }
-           }
-
-           return emptyNum === allNum;
-       } else {
-           let allHas = true, emptyNum = 0, allNum = 0;
-           for (let k in tar) {
-               allNum++;
-               if (ListFilterPipe.isNullOrUndefined(src[ k ]) || ListFilterPipe.isNullOrUndefined(tar[ k ])
-                   || isEmptyArray(src[ k ]) || isEmptyArray(tar[ k ])) {
-                   emptyNum++;
-                   continue;
-               }
-               if (!(k in src) || !this.compareAnys(src[ k ], tar[ k ], logic)) {
-                   allHas = false;
-                   break;
-               }
-           }
-
-           return emptyNum === allNum ? true : allHas;
-       }
-   }
-
-   private static compareArrays(src: any[], tar: any[]): boolean {
-       if (src.length < tar.length) {
-           return false;
-       }
-
-       out: for (let t of tar) {
-           if (ListFilterPipe.isNullOrUndefined(t)) {
-               continue;
-           }
-           for (let s of src) {
-               if (ListFilterPipe.isNullOrUndefined(s)) {
-                   continue;
-               }
-               if (isEqual(t, s)) {
-                   continue out;
-               }
-           }
-
-           return false;
-       }
-
-       return true;
-   }
-
-
-
-   */
 
     private static getAsyncsAndCreateFilterImage(obj: any) {
         let asyncs: Array<Observable<any>> = [];
@@ -490,12 +218,6 @@ export class ListFilterPipe implements PipeTransform {
         }
 
         return target;
-    }
-
-    private static isSinglePrimitiveObject(v: any) {
-        return isObject(v)
-            && Object.keys(v).length === 1
-            && this.COMPARE_OPERATORS.indexOf(Object.keys(v)[ 0 ].toLowerCase()) >= 0;
     }
 
 }

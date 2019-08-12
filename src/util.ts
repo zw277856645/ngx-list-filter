@@ -6,20 +6,12 @@ export function isNullOrUndefined(v: any) {
     return v === null || v === undefined;
 }
 
-export function isPrimitive(v: any) {
-    return (typeof v !== 'object' && typeof v !== 'function') || v === null;
-}
-
 export function isEmptyString(v: any) {
     return typeof v === 'string' && v.trim().length === 0;
 }
 
 export function isEmpty(v: any) {
     return isNullOrUndefined(v) || isEmptyString(v);
-}
-
-export function isStringAndNumber(a: any, b: any) {
-    return (typeof a === 'string' && typeof b === 'number') || (typeof a === 'number' && typeof b === 'string');
 }
 
 export function clone(obj: any) {
@@ -33,4 +25,31 @@ export function clone(obj: any) {
     }
 
     return obj;
+}
+
+export type ValueGetter = (obj: any, key: string) => any;
+
+export function valueGetter(obj: any, key: string) {
+    if (key.includes('.')) {
+        let keyArr = key.split('.'), sub = obj;
+        for (let k of keyArr) {
+            sub = sub[ k ];
+        }
+
+        return sub;
+    }
+
+    return obj[ key ];
+}
+
+export function objectify(a: any) {
+    let rows = [];
+
+    for (let key in a) {
+        if (a.hasOwnProperty(key)) {
+            rows.push({ [ key ]: a[ key ] });
+        }
+    }
+
+    return rows;
 }
