@@ -23,3 +23,20 @@
 - 嵌入对象匹配，使用点记法(a.b.c)
 - 数组内对象匹配($elemMatch)
 - 自定义判断逻辑($cb)
+
+## 📦 安装
+> npm install ngx-list-filter --save
+
+## 🔨 使用
+#### 1. 引入module
+``` js
+import { NgxListFilterModule } from 'ngx-list-filter';
+
+@NgModule({
+    imports: [
+        NgxListFilterModule
+    ]
+})
+export class AppModule {
+}
+```
