@@ -283,7 +283,7 @@ $eq 也可用于数组，但是只能使用一个原始类型的值，数组类�
 export class XxxComponent {
     
     constructor(private listFilter: ListFilterPipe) {
-        list = listFilter.transform(list, { name: $reg: 'xxx' });
+        list = listFilter.transform(list, { name: { $reg: 'xxx' } });
     }
 
 }
