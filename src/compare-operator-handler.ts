@@ -1,4 +1,4 @@
-import { convert2Array, isEmpty } from './util';
+import { isEmpty } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
 
 declare var _: any;
