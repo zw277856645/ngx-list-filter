@@ -276,3 +276,15 @@ $eq 也可用于数组，但是只能使用一个原始类型的值，数组类�
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{age:{$cb:logicFunction}}"></ng-container>
 ```
+
+#### 本管道也可当做服务使用
+
+``` js
+export class XxxComponent {
+    
+    constructor(private listFilter: ListFilterPipe) {
+        list = listFilter.transform(list, { name: $reg: 'xxx' });
+    }
+
+}
+```
