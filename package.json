@@ -7,7 +7,8 @@
     "publish": "npm publish dist",
     "clean": "rimraf dist",
     "test": "karma start",
-    "test:watch": "karma start --single-run=false"
+    "test:watch": "karma start --single-run=false",
+    "lint": "tslint -c tslint.json -p tsconfig.json"
   },
   "$schema": "./node_modules/ng-packagr/package.schema.json",
   "ngPackage": {
@@ -57,7 +58,7 @@
     "ts-loader": "5.4.4",
     "jasmine-core": "3.3.0",
     "ng-packagr": "5.1.0",
-    "ajv": "6.1.0",
+    "ajv": "6.9.1",
     "karma": "1.5.0",
     "karma-chrome-launcher": "2.0.0",
     "karma-jasmine": "2.0.0",
@@ -65,6 +66,9 @@
     "karma-spec-reporter": "0.0.30",
     "karma-webpack": "4.0.2",
     "rimraf": "2.6.1",
+    "rxjs-tslint": "0.1.7",
+    "tslint": "5.11.0",
+    "codelyzer": "5.1.0",
     "typescript": "3.4.5",
     "webpack": "4.19.1",
     "webpack-cli": "3.1.0",

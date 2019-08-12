@@ -42,7 +42,7 @@ export function valueGetter(obj: any, key: string) {
     return obj[ key ];
 }
 
-export function objectify(a: any) {
+export function convert2Array(a: any) {
     let rows = [];
 
     for (let key in a) {

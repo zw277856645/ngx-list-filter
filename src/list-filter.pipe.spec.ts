@@ -1,9 +1,6 @@
 import { ListFilterPipe } from './list-filter.pipe';
-import { ListFilterConfig } from './list-filter-config';
-import { data } from './data';
-import { LogicOperatorHandler } from './logic-operator-handler';
-import { CompareOperatorHandler } from './compare-operator-handler';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { data, data_0, data_1, data_2, data_3, data_4, data_5 } from './data';
+import { TestBed } from '@angular/core/testing';
 import { NgxListFilterModule } from './ngx-list-filter.module';
 
 describe('list filter pipe', () => {
@@ -14,213 +11,195 @@ describe('list filter pipe', () => {
         pipe = TestBed.get(ListFilterPipe);
     });
 
-    it('', () => {
-        console.log(pipe);
+    describe('比较操作符', () => {
+        it('null、undefined、空字符串', () => {
+            expect(pipe.transform(data, { name: '' })).toEqual([ data_3, data_4, data_5 ]);
+            expect(pipe.transform(data, { name: 'xxx' })).toEqual([]);
+        });
+
+        it('$lt、$lte、$gt、$gte', () => {
+            expect(pipe.transform(data, { age: { $lt: 28 } })).toEqual([ data_0, data_4, data_5 ]);
+            expect(pipe.transform(data, { age: { $lte: '28' } })).toEqual([ data_0, data_1, data_4, data_5 ]);
+        });
+
+        it('$in、$nin', () => {
+            expect(pipe.transform(data, { age: { $in: [ 28, '77', 200 ] } })).toEqual([ data_1, data_2 ]);
+            expect(pipe.transform(data, { name: { $nin: [ '张三', '李四', '王五', null ] } })).toEqual([ data_1 ]);
+
+            expect(pipe.transform(data, { loves: { $in: [ '苹果' ] } })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { loves: { $in: [ '苹果', '橘子' ] } }))
+                .toEqual([ data_0, data_1, data_3, data_4, data_5 ]);
+        });
+
+        it('$between', () => {
+            expect(pipe.transform(data, { age: { $between: [ '28', 100 ] } }) as any[]).toEqual([ data_2, data_3 ]);
+        });
+
+        it('$eq，与没有操作符等效', () => {
+            expect(pipe.transform(data, { name: '张三' })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { name: { $eq: '张三' } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { name: { $eq: '张' } })).toEqual([], '非正则匹配');
+
+            expect(pipe.transform(data, { age: 28 }) as any[]).toEqual([ data_1 ]);
+            expect(pipe.transform(data, { age: { $eq: '28' } })).toEqual([ data_1 ]);
+
+            expect(pipe.transform(data, { loves: '苹果' })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { loves: { $eq: '苹果' } })).toEqual([ data_0, data_1 ]);
+
+            expect(pipe.transform(data, { loves: [ '苹果', '橘子' ] }))
+                .toEqual([ data_0, data_1, data_3, data_4, data_5 ], '相当于 $in');
+            expect(pipe.transform(data, { loves: { $eq: [ '苹果', '橘子' ] } }))
+                .toEqual([], '不符合规则，需使用数组相关操作符');
+
+            expect(pipe.transform(data, { date: '2019/8/12 1:34:55' })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { date: new Date('2019/8/12 1:34:55') })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { date: Date.parse('2019/8/12 1:34:55') })).toEqual([ data_0, data_1 ]);
+        });
+
+        it('$neq', () => {
+            expect(pipe.transform(data, { age: { $neq: 12 } })).toEqual([ data_1, data_2, data_3 ]);
+            expect(pipe.transform(data, { loves: { $neq: '橘子' } })).toEqual([ data_1, data_2 ]);
+            expect(pipe.transform(data, { loves: { $neq: [ '苹果', '橘子' ] } })).toEqual([ data_2 ], '相当于 $nin');
+        });
+
+        it('$deepEquals', () => {
+            expect(pipe.transform(data,
+                { addr: { $deepEquals: { street: '南京路', code: '25号', rooms: [ 12, 23 ] } } }
+            )).toEqual([ data_0 ]);
+        });
+
+        it('$exists', () => {
+            expect(pipe.transform(data, { name: { $exists: true } }))
+                .toEqual([ data_0, data_1, data_2, data_3, data_4 ]);
+            expect(pipe.transform(data, { 'addr.rooms': { $exists: true } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { 'addr.rooms': { $exists: false } }))
+                .toEqual([ data_1, data_2, data_3, data_4, data_5 ]);
+        });
+
+        it('$reg，默认忽略大小写', () => {
+            expect(pipe.transform(data, { id: /ab/ })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { id: { $reg: /ab/ } })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { id: { $reg: 'ab' } })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { id: { $reg: 'ab', $flags: 'i' } })).toEqual([ data_0, data_1 ]);
+        });
+
+        it('$before、$after', () => {
+            expect(pipe.transform(data, { date: { $before: '2019/8/1 12:00:00' } })).toEqual([ data_2, data_3 ]);
+            expect(pipe.transform(data, { date: { $after: '2019/8/5 12:00:00' } }))
+                .toEqual([ data_0, data_1, data_4, data_5 ]);
+        });
+
+        it('$contains', () => {
+            expect(pipe.transform(data, { loves: '苹果' })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { loves: { $contains: '苹果' } })).toEqual([ data_0, data_1 ]);
+        });
+
+        it('$all', () => {
+            expect(pipe.transform(data, { loves: { $all: [ '苹果', '橘子' ] } })).toEqual([ data_0 ]);
+        });
+
+        it('$any', () => {
+            expect(pipe.transform(data, { loves: { $any: [ '苹果', '栗子' ] } })).toEqual([ data_0, data_1 ]);
+        });
+
+        it('$size', () => {
+            expect(pipe.transform(data, { loves: { $size: 2 } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { addr: { $size: 3 } })).toEqual([ data_0 ]);
+        });
+
+        it('$mod', () => {
+            expect(pipe.transform(data, { age: { $mod: [ 2, 1 ] } })).toEqual([ data_2 ]);
+        });
+
+        it('点记法，深度属性查找', () => {
+            expect(pipe.transform(data, { 'addr.code': { $reg: '5' } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { 'addr.rooms': { $contains: 12 } })).toEqual([ data_0 ]);
+        });
+
+        it('$elemMatch', () => {
+            expect(pipe.transform(data, { families: { $elemMatch: { age: { $gt: 70 } } } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { families: { $elemMatch: { 'addr.rooms': 122 } } }))
+                .toEqual([ data_0, data_1 ]);
+        });
+
+        it('$cb', () => {
+            expect(pipe.transform(data, { families: { $cb: (v: any[]) => v && v.length } }))
+                .toEqual([ data_0, data_1 ]);
+        });
     });
 
-    //describe('测试 comparePrimitive 方法（srcProp 是原始类型）', () => {
-    //    let caller: Function;
-    //
-    //    beforeEach(() => caller = spyOn(pipe, 'comparePrimitive').and.callThrough());
-    //
-    //    it('srcProp 是 null、undefined、空字符串，返回值根据配置决定', () => {
-    //        expect(caller.call(pipe, null, {})).toBeFalsy();
-    //        expect(caller.call(pipe, undefined, {})).toBeFalsy();
-    //        expect(caller.call(pipe, '', {})).toBeFalsy();
-    //
-    //        expect(caller.call({ nullExclude: false }, null, {})).toBeTruthy();
-    //        expect(caller.call({ undefinedExclude: false }, undefined, {})).toBeTruthy();
-    //        expect(caller.call({ emptyStringExclude: false }, '', {})).toBeTruthy();
-    //    });
-    //
-    //    describe('filterProp 是原始类型', () => {
-    //        it('字符串和字符串，使用正则匹配', () => {
-    //            expect(caller.call(pipe, 'ab', 'a')).toBeTruthy();
-    //            expect(caller.call(null, 'ab', 'c')).toBeFalsy();
-    //        });
-    //
-    //        it('enableDigit2String = true & 数字和字符串，使用正则匹配', () => {
-    //            expect(caller.call(pipe, 12, '1')).toBeTruthy();
-    //            expect(caller.call(pipe, 12, '3')).toBeFalsy();
-    //
-    //            expect(caller.call(pipe, '12a', 1)).toBeTruthy();
-    //            expect(caller.call(pipe, '12a', 3)).toBeFalsy();
-    //        });
-    //
-    //        describe('enableDigit2String = false & 其他情况', () => {
-    //            beforeEach(() => pipe.enableDigit2String = false);
-    //
-    //            it('strictMatch = false，使用 ==', () => {
-    //                expect(caller.call(pipe, 0, 1)).toBeFalsy();
-    //                expect(caller.call(pipe, 0, 0)).toBeTruthy();
-    //                expect(caller.call(pipe, 0, Symbol())).toBeFalsy();
-    //                expect(caller.call(pipe, 0, NaN)).toBeFalsy();
-    //
-    //                expect(caller.call(pipe, 0, '0')).toBeTruthy();
-    //                expect(caller.call(pipe, 0, false)).toBeTruthy();
-    //                expect(caller.call(pipe, '0', false)).toBeTruthy();
-    //                expect(caller.call(pipe, 1, true)).toBeTruthy();
-    //                expect(caller.call(pipe, '1', true)).toBeTruthy();
-    //            });
-    //
-    //            describe('strictMatch = true，使用 ===', () => {
-    //                beforeEach(() => pipe.strictMatch = true);
-    //
-    //                it('部分严格比较不成立的情况', () => {
-    //                    expect(caller.call(pipe, 0, '0')).toBeFalsy();
-    //                    expect(caller.call(pipe, 0, false)).toBeFalsy();
-    //                    expect(caller.call(pipe, '0', false)).toBeFalsy();
-    //                    expect(caller.call(pipe, 1, true)).toBeFalsy();
-    //                    expect(caller.call(pipe, '1', true)).toBeFalsy();
-    //                });
-    //            });
-    //        });
-    //    });
-    //
-    //    describe('filterProp 只有一个比较操作符的对象', () => {
-    //        it('值为不符合使用规则的情况，返回 true', () => {
-    //            expect(caller.call(pipe, {}, { '$lt': {} })).toBeTruthy();
-    //            expect(caller.call(pipe, {}, { '$lt': [] })).toBeTruthy();
-    //            expect(caller.call(pipe, {}, { '$in': 1 })).toBeTruthy();
-    //        });
-    //
-    //        it('值为空，返回 true', () => {
-    //            expect(caller.call(pipe, {}, { '$lt': null })).toBeTruthy();
-    //            expect(caller.call(pipe, {}, { '$lt': undefined })).toBeTruthy();
-    //            expect(caller.call(pipe, {}, { '$lt': '' })).toBeTruthy();
-    //        });
-    //
-    //        describe('严格模式', () => {
-    //            beforeEach(() => pipe.strictMatch = true);
-    //
-    //            it('类型不同，返回 false', () => {
-    //                expect(caller.call(pipe, 1, { '$lt': true })).toBeFalsy();
-    //                expect(caller.call(pipe, 1, { '$lt': '1' })).toBeFalsy();
-    //            });
-    //        });
-    //
-    //        describe('其他情况根据操作符比较', () => {
-    //            describe('$fullMatch', () => {
-    //                it('enableDigit2String = true & 数字和字符串或字符串和字符串', () => {
-    //                    expect(caller.call(pipe, 12, { '$fullMatch': '1' })).toBeFalsy();
-    //                    expect(caller.call(pipe, ' 12 ', { '$fullMatch': 12 })).toBeTruthy();
-    //                    expect(caller.call(pipe, 12, { '$fullMatch': ' 12 ' })).toBeTruthy();
-    //                    expect(caller.call(pipe, 'abc', { '$fullMatch': 'AbC' })).toBeTruthy();
-    //                });
-    //
-    //                it('比较对象不是字符串和数字时，退化为 === 或 == 比较，由 strictMatch 配置决定', () => {
-    //                    expect(caller.call(pipe, 1, { '$fullMatch': true })).toBeTruthy();
-    //                    expect(caller.call(pipe, 0, '0')).toBeTruthy();
-    //                });
-    //            });
-    //
-    //            it('$lt / $gt', () => {
-    //                expect(caller.call(pipe, 5, { '$lt': 7 })).toBeTruthy();
-    //                expect(caller.call(pipe, 5, { '$lt': '7' })).toBeTruthy();
-    //                expect(caller.call(pipe, 5, { '$lt': 5 })).toBeFalsy();
-    //                expect(caller.call(pipe, 0, { '$lt': true })).toBeTruthy();
-    //            });
-    //
-    //            it('$lte / $gte', () => {
-    //                expect(caller.call(pipe, 5, { '$lte': 5 })).toBeTruthy();
-    //                expect(caller.call(pipe, 5, { '$lte': 4 })).toBeFalsy();
-    //            });
-    //
-    //            it('$in / $nin', () => {
-    //                expect(caller.call(pipe, 5, { '$in': [ 3, 5, 8 ] })).toBeTruthy();
-    //                expect(caller.call(pipe, 5, { '$in': [ 9, 10 ] })).toBeFalsy();
-    //
-    //                expect(caller.call(pipe, 5, { '$nin': [ 3, 5, 8 ] })).toBeFalsy();
-    //                expect(caller.call(pipe, 5, { '$nin': [ 9, 10 ] })).toBeTruthy();
-    //            });
-    //
-    //            it('$range', () => {
-    //                expect(caller.call(pipe, 5, { '$range': [ 5, 10 ] })).toBeTruthy();
-    //                expect(caller.call(pipe, 5, { '$range': [ 8, 10 ] })).toBeFalsy();
-    //            });
-    //
-    //            it('无法比较抛异常的情况返回 true', () => {
-    //                expect(caller.call(pipe, 5, { '$lt': Symbol() })).toBeTruthy();
-    //            });
-    //        });
-    //    });
-    //});
-    //
-    //describe('数据测试', () => {
-    //    describe('srcProp 是原始类型，filterProp 是原始类型', () => {
-    //        let data: any[];
-    //
-    //        beforeEach(() => data = [ undefined, null, '', 12, '12', false, true ]);
-    //
-    //        it('非严格模式，排除空值，允许数字转字符串', () => {
-    //            expect(pipe.transform(data, 2)).toEqual([ '12' ]);
-    //            expect(pipe.transform(data, '2')).toEqual([ 12, '12' ]);
-    //            expect(pipe.transform(data, 0)).toEqual([ false ]);
-    //            expect(pipe.transform(data, 1)).toEqual([ '12', true ]);
-    //        });
-    //
-    //        describe('严格模式，包含空值，禁止数字转字符串', () => {
-    //            beforeEach(() => {
-    //                pipe.strictMatch = true;
-    //                pipe.nullExclude = false;
-    //                pipe.undefinedExclude = false;
-    //                pipe.emptyStringExclude = false;
-    //                pipe.enableDigit2String = false;
-    //            });
-    //
-    //            it('相同数据测试', () => {
-    //                expect(pipe.transform(data, 2)).toEqual([ undefined, null, '' ]);
-    //                expect(pipe.transform(data, '2')).toEqual([ undefined, null, '', '12' ]);
-    //                expect(pipe.transform(data, 0)).toEqual([ undefined, null, '' ]);
-    //                expect(pipe.transform(data, 1)).toEqual([ undefined, null, '' ]);
-    //            });
-    //        });
-    //    });
-    //
-    //    describe('srcProp 是原始类型，filterProp 只有一个比较操作符的对象', () => {
-    //        let data: any[];
-    //
-    //        beforeEach(() => data = [ 12, '23', 9, 99, 'AbC', false, true ]);
-    //
-    //        it('不符合使用规则', () => {
-    //            expect(pipe.transform(data, { '$lt': [ 1 ] })).toEqual(data);
-    //            expect(pipe.transform(data, { '$in': 1 })).toEqual(data);
-    //            expect(pipe.transform(data, { '$gt': {} })).toEqual(data);
-    //        });
-    //
-    //        it('$fullMatch', () => {
-    //            expect(pipe.transform(data, { '$fullMatch': 2 })).toEqual([]);
-    //            expect(pipe.transform(data, { '$fullMatch': 'abc' })).toEqual([ 'AbC' ]);
-    //            expect(pipe.transform(data, { '$fullMatch': '23' })).toEqual([ '23' ]);
-    //            expect(pipe.transform(data, { '$fullMatch': 1 })).toEqual([ true ]);
-    //        });
-    //
-    //        it('$lt / $gt', () => {
-    //            expect(pipe.transform(data, { '$lt': 77 })).toEqual([ 12, '23', 9, false, true ]);
-    //            expect(pipe.transform(data, { '$lt': '77' })).toEqual([ 12, '23', 9, false, true ]);
-    //            expect(pipe.transform(data, { '$lt': true })).toEqual([ false ]);
-    //        });
-    //
-    //        it('$in / $nin', () => {
-    //            expect(pipe.transform(data, { '$in': [ 12, 99, 'AbC' ] })).toEqual([ 12, 99, 'AbC' ]);
-    //            expect(pipe.transform(data, { '$in': [ 10 ] })).toEqual([]);
-    //
-    //            expect(pipe.transform(data, { '$nin': [ 12, 99, 'AbC' ] })).toEqual([ '23', 9, false, true ]);
-    //            expect(pipe.transform(data, { '$nin': [ 10 ] })).toEqual(data);
-    //        });
-    //
-    //        it('$range', () => {
-    //            expect(pipe.transform(data, { '$range': [ 1, 29 ] })).toEqual([ 12, '23', 9, true ]);
-    //        });
-    //
-    //        it('无法比较抛异常的情况返回 true', () => {
-    //            expect(pipe.transform(data, { '$lt': Symbol() })).toEqual(data);
-    //        });
-    //    });
-    //
-    //    describe('srcProp 是对象类型', () => {
-    //
-    //    });
-    //});
+    describe('顶层 - 逻辑操作符', () => {
+        it('$or', () => {
+            expect(pipe.transform(data, { $or: { age: { $lt: 28 }, id: /ab/i } }))
+                .toEqual([ data_0, data_1, data_4, data_5 ]);
+            expect(pipe.transform(data, { $or: [ { age: { $lt: 28 } }, { id: /ab/i } ] }))
+                .toEqual([ data_0, data_1, data_4, data_5 ]);
+        });
+
+        it('$nor', () => {
+            expect(pipe.transform(data, { $nor: { age: { $lt: 28 }, id: /ab/i } })).toEqual([ data_2, data_3 ]);
+            expect(pipe.transform(data, { $nor: [ { age: { $lt: 28 } }, { id: /ab/i } ] })).toEqual([ data_2, data_3 ]);
+        });
+
+        it('$and，与没有操作符等效', () => {
+            expect(pipe.transform(data, { age: { $lt: 28 }, id: /ab/i })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { $and: { age: { $lt: 28 }, id: /ab/i } })).toEqual([ data_0 ]);
+            expect(pipe.transform(data, { $and: [ { age: { $lt: 28 } }, { id: /ab/i } ] })).toEqual([ data_0 ]);
+        });
+
+        it('$not', () => {
+            expect(pipe.transform(data, { $not: { age: { $lt: 28 } } })).toEqual([ data_1, data_2, data_3 ]);
+        });
+    });
+
+    describe('具体属性 - 逻辑操作符', () => {
+        it('$or', () => {
+            expect(pipe.transform(data, { age: { $or: { $lt: 28, $gt: 50 } } }))
+                .toEqual([ data_0, data_2, data_4, data_5 ]);
+            expect(pipe.transform(data, { age: { $or: [ { $lt: 28 }, { $gt: 50 } ] } }))
+                .toEqual([ data_0, data_2, data_4, data_5 ]);
+        });
+
+        it('$nor', () => {
+            expect(pipe.transform(data, { age: { $nor: { $lt: 28, $gt: 50 } } })).toEqual([ data_1, data_3 ]);
+            expect(pipe.transform(data, { age: { $nor: [ { $lt: 28 }, { $gt: 50 } ] } })).toEqual([ data_1, data_3 ]);
+        });
+
+        it('$and，与没有操作符等效', () => {
+            expect(pipe.transform(data, { age: { $gt: 28, $lt: 50 } })).toEqual([ data_3 ]);
+            expect(pipe.transform(data, { age: { $and: { $gt: 28, $lt: 50 } } })).toEqual([ data_3 ]);
+            expect(pipe.transform(data, { age: { $and: [ { $gt: 28 }, { $lt: 50 } ] } })).toEqual([ data_3 ]);
+        });
+
+        it('$not', () => {
+            expect(pipe.transform(data, { age: { $not: { $lt: 28 } } })).toEqual([ data_1, data_2, data_3 ]);
+        });
+    });
+
+    it('混合', () => {
+        expect(pipe.transform(data, { $not: { age: { $and: { $gt: 28, $lt: 50 } } } }))
+            .toEqual([ data_0, data_1, data_2, data_4, data_5 ]);
+
+        expect(pipe.transform(data, { $not: { $or: { age: { $gt: 28 }, id: /ab/i } } })).toEqual([ data_4, data_5 ]);
+        expect(pipe.transform(data, { $nor: { age: { $gt: 28 }, id: /ab/i } })).toEqual([ data_4, data_5 ]);
+
+        expect(pipe.transform(data,
+            {
+                $or: {
+                    families: {
+                        $elemMatch: {
+                            age: { $gt: 70 },
+                            'addr.rooms': { $contains: 122 }
+                        }
+                    },
+                    age: { $and: { $gte: 28, $lte: 50 } },
+                    $and: [
+                        { man: true },
+                        { loves: { $any: [ '苹果', '橘子' ] } }
+                    ]
+                }
+            }
+        )).toEqual([ data_0, data_1, data_3, data_5 ]);
+    });
 
 });

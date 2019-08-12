@@ -1,11 +1,12 @@
-import { objectify, ValueGetter } from './util';
+import { convert2Array, ValueGetter } from './util';
 import { CompareOperatorHandler } from './compare-operator-handler';
 
 export class LogicOperatorHandler {
 
     private compareHandler = new CompareOperatorHandler(this);
 
-    constructor(private valueGetter: ValueGetter) {
+    constructor(public regFlags: string,
+                private valueGetter: ValueGetter) {
     }
 
     match(row: any[], constraints: any) {
@@ -35,7 +36,7 @@ export class LogicOperatorHandler {
 
     $or(row: any[], constraint: any) {
         if (!Array.isArray(constraint)) {
-            constraint = objectify(constraint);
+            constraint = convert2Array(constraint);
         }
 
         for (let c of constraint) {
@@ -53,7 +54,7 @@ export class LogicOperatorHandler {
 
     $and(row: any[], constraint: any) {
         if (!Array.isArray(constraint)) {
-            constraint = objectify(constraint);
+            constraint = convert2Array(constraint);
         }
 
         for (let c of constraint) {

@@ -1,4 +1,4 @@
-import { isEmpty } from './util';
+import { convert2Array, isEmpty } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
 
 declare var _: any;
@@ -12,15 +12,18 @@ export class CompareOperatorHandler {
         if (constraint === value) {
             return true;
         } else if (constraint instanceof RegExp) {
-            return this.$regex(value, constraint);
+            return this.$reg(value, constraint);
         } else if (Array.isArray(constraint)) {
             return this.$in(value, constraint);
         } else if (constraint && typeof constraint === 'object') {
             if (constraint instanceof Date) {
                 return this.$eq(value, constraint.getTime());
             } else {
-                if (constraint.$regex) {
-                    return this.$regex(value, new RegExp(constraint.$regex, constraint.$options));
+                if (constraint.$reg) {
+                    return this.$reg(
+                        value,
+                        new RegExp(constraint.$reg, constraint.$flags || this.logicHandler.regFlags)
+                    );
                 }
 
                 for (let key in constraint) {
@@ -44,108 +47,26 @@ export class CompareOperatorHandler {
 
             return false;
         } else if (isEmpty(constraint)) {
-            return this.$null(value);
+            return this.null(value);
         } else {
             return this.$eq(value, constraint);
         }
     }
 
-    $cb(value: any, constraint: Function) {
-        return constraint(value);
+    $gte(values: any, ref: any) {
+        return !this.null(values) && values >= ref;
     }
 
-    $null(values: any) {
-        if (isEmpty(values)) {
-            return true;
-        } else if (Array.isArray(values)) {
-            for (let v of values) {
-                if (!this.$null(v)) {
-                    return false;
-                }
-            }
-
-            return true;
-        } else {
-            return false;
-        }
+    $gt(values: any, ref: any) {
+        return !this.null(values) && values > ref;
     }
 
-    $eq(value: any, constraint: any) {
-        if (value === constraint) {
-            return true;
-        } else if (Array.isArray(value)) {
-            for (let v of value) {
-                if (this.$eq(v, constraint)) {
-                    return true;
-                }
-            }
-
-            return false;
-        } else if (isEmpty(constraint)) {
-            return this.$null(value);
-        } else if (isEmpty(value)) {
-            return false;
-        } else if (value instanceof Date) {
-            if (constraint instanceof Date) {
-                return value.getTime() === constraint.getTime();
-            } else if (typeof constraint === 'number') {
-                return value.getTime() === constraint;
-            } else if (typeof constraint === 'string') {
-                return value.getTime() === (new Date(constraint)).getTime();
-            }
-        } else {
-            return value == constraint;
-        }
+    $lt(values: any, ref: any) {
+        return !this.null(values) && values < ref;
     }
 
-    $exists(value: any, constraint: any) {
-        return (value !== undefined) == (constraint && true);
-    }
-
-    $deepEquals(value: any, constraint: any) {
-        if (typeof _ === 'undefined' || typeof _.isEqual === 'undefined') {
-            return JSON.stringify(value) === JSON.stringify(constraint);
-        } else {
-            return _.isEqual(value, constraint);
-        }
-    }
-
-    $neq(values: any, constraint: any) {
-        return !this.match(values, constraint);
-    }
-
-    $or(values: any, constraint: any) {
-        if (!Array.isArray(values)) {
-            values = [ values ];
-        }
-
-        for (let v of values) {
-            for (let c of constraint) {
-                if (this.match(v, c)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    $nor(values: any, constraint: any) {
-        return !this.$or(values, constraint);
-    }
-
-    $and(values: any, constraint: any) {
-        if (!Array.isArray(constraint)) {
-            throw new Error('$and operator needs array of constraint objects');
-        }
-
-        for (let c of constraint) {
-            if (!this.match(values, c)) {
-                return false;
-            }
-        }
-
-        return true;
+    $lte(values: any, ref: any) {
+        return !this.null(values) && values <= ref;
     }
 
     $in(values: any, constraint: any) {
@@ -172,21 +93,56 @@ export class CompareOperatorHandler {
         return !this.$in(values, constraint);
     }
 
-    $elemMatch(values: any, constraint: any) {
-        for (let v of values) {
-            if (this.logicHandler.match(v, constraint)) {
-                return true;
+    $between(values: any, ref: any) {
+        return this.match(values, { $gt: ref[ 0 ], $lt: ref[ 1 ] });
+    }
+
+    $eq(value: any, constraint: any) {
+        if (value === constraint) {
+            return true;
+        } else if (Array.isArray(value)) {
+            for (let v of value) {
+                if (this.$eq(v, constraint)) {
+                    return true;
+                }
             }
+
+            return false;
+        } else if (isEmpty(constraint)) {
+            return this.null(value);
+        } else if (isEmpty(value)) {
+            return false;
+        } else if (value instanceof Date) {
+            if (constraint instanceof Date) {
+                return value.getTime() === constraint.getTime();
+            } else if (typeof constraint === 'number') {
+                return value.getTime() === constraint;
+            } else if (typeof constraint === 'string') {
+                return value.getTime() === (new Date(constraint)).getTime();
+            }
+        } else {
+            // tslint:disable-next-line:triple-equals
+            return value == constraint;
         }
-
-        return false;
     }
 
-    $contains(values: any[], constraint: any) {
-        return values.indexOf(constraint) >= 0;
+    $neq(values: any, constraint: any) {
+        return !this.match(values, constraint);
     }
 
-    $regex(values: any, constraint: RegExp) {
+    $deepEquals(value: any, constraint: any) {
+        if (typeof _ === 'undefined' || typeof _.isEqual === 'undefined') {
+            return JSON.stringify(value) === JSON.stringify(constraint);
+        } else {
+            return _.isEqual(value, constraint);
+        }
+    }
+
+    $exists(value: any, constraint: any) {
+        return (value !== undefined) === (constraint && true);
+    }
+
+    $reg(values: any, constraint: RegExp) {
         if (Array.isArray(values)) {
             for (let v of values) {
                 if (constraint.test(v)) {
@@ -198,55 +154,29 @@ export class CompareOperatorHandler {
         }
     }
 
-    $gte(values: any, ref: any) {
-        return !this.$null(values) && values >= CompareOperatorHandler.resolve(ref);
-    }
-
-    $gt(values: any, ref: any) {
-        return !this.$null(values) && values > CompareOperatorHandler.resolve(ref);
-    }
-
-    $lt(values: any, ref: any) {
-        return !this.$null(values) && values < CompareOperatorHandler.resolve(ref);
-    }
-
-    $lte(values: any, ref: any) {
-        return !this.$null(values) && values <= CompareOperatorHandler.resolve(ref);
-    }
-
     $before(values: any, ref: any) {
-        if (typeof ref === 'string') {
-            ref = Date.parse(ref);
-        }
-        if (typeof values === 'string') {
-            values = Date.parse(values);
-        }
-
-        return this.$lte(values, ref);
+        return this.$lte(CompareOperatorHandler.resolveDate(values), CompareOperatorHandler.resolveDate(ref));
     }
 
     $after(values: any, ref: any) {
-        if (typeof ref === 'string') {
-            ref = Date.parse(ref);
-        }
-        if (typeof values === 'string') {
-            values = Date.parse(values);
+        return this.$gte(CompareOperatorHandler.resolveDate(values), CompareOperatorHandler.resolveDate(ref));
+    }
+
+    $contains(values: any[], constraint: any) {
+        if (values && !Array.isArray(values)) {
+            throw new Error('$contains requires an array operand');
         }
 
-        return this.$gte(values, ref);
+        return (values || []).indexOf(constraint) >= 0;
     }
 
     $all(values: any, constraint: any) {
         if (!Array.isArray(constraint)) {
-            throw new Error('$all requires an array operand');
-        }
-
-        if (!Array.isArray(values)) {
-            values = [ values ];
+            throw new Error('$and operator needs array of constraint objects');
         }
 
         for (let c of constraint) {
-            if (!this.$eq(values, c)) {
+            if (!this.match(values, c)) {
                 return false;
             }
         }
@@ -256,15 +186,11 @@ export class CompareOperatorHandler {
 
     $any(values: any, constraint: any) {
         if (!Array.isArray(constraint)) {
-            throw new Error('$any requires an array operand');
-        }
-
-        if (!Array.isArray(values)) {
-            values = [ values ];
+            throw new Error('$any operator needs array of constraint objects');
         }
 
         for (let c of constraint) {
-            if (this.$eq(values, c)) {
+            if (this.match(values, c)) {
                 return true;
             }
         }
@@ -280,17 +206,60 @@ export class CompareOperatorHandler {
         return values % ref[ 0 ] === ref[ 1 ];
     }
 
-    $between(values: any, ref: any) {
-        return this.match(values, { $gt: ref[ 0 ], $lt: ref[ 1 ] });
-    }
-
-    private static resolve(ref: any) {
-        if (typeof ref === 'object') {
-            if (ref[ '$date' ]) {
-                return Date.parse(ref[ '$date' ]);
+    $elemMatch(values: any, constraint: any) {
+        for (let v of (values || [])) {
+            if (this.logicHandler.match(v, constraint)) {
+                return true;
             }
         }
 
-        return ref;
+        return false;
     }
+
+    $cb(value: any, constraint: Function) {
+        return constraint(value);
+    }
+
+    $not(values: any, constraint: any) {
+        return !this.match(values, constraint);
+    }
+
+    $or(values: any, constraint: any) {
+        return this.logicHandler.$or.call(this, values, constraint);
+    }
+
+    $nor(values: any, constraint: any) {
+        return !this.$or(values, constraint);
+    }
+
+    $and(values: any, constraint: any) {
+        return this.logicHandler.$and.call(this, values, constraint);
+    }
+
+    private null(values: any) {
+        if (isEmpty(values)) {
+            return true;
+        } else if (Array.isArray(values)) {
+            for (let v of values) {
+                if (!this.null(v)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private static resolveDate(value: any) {
+        if (typeof value === 'string') {
+            return Date.parse(value);
+        } else if (value instanceof Date) {
+            return value.getTime();
+        } else {
+            return value;
+        }
+    }
+
 }

@@ -6,56 +6,6 @@ import { ListFilterConfig } from './list-filter-config';
 import { clone, isEmpty, isNullOrUndefined, isObject, valueGetter } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
 
-/**
- * 规则：
- * [logic] listValue + filter
- *
- * PS：
- * 当比较对象为objectValue和value且都为字符串时，判断是否包含
- * 当比较对象为arrayValue和value且都为字符串时，判断是否完全相等
- *
- *
- * [any] undefined + any -> false
- * [any] any + undefined -> true
- *
- * [any] primitive + primitive -> 基本类型比较相等，字符串判断包含
- * ex：[1,2,3,4] listFilter 2 -> [2]
- * ex：['abc','cg','yu'] listFilter 'c' -> ['abc','cg']
- *
- * [any] primitive + object -> true，没有可比性
- *
- * [any] primitive + array -> 判断数组是否包含该值
- * ex：[1,2,3,4] listFilter [1,4,6] -> [1,4]
- * ex：['abc','cg','yu',12] listFilter ['c','yu',12,9] -> ['yu',12]
- *
- * [any] object + primitive -> 判断对象中是否有值等于或包含该值(根据对象值类型深度比较)
- * ex：[{name:'zhangsan',age:12},{name:'wangwu',age:27}] listFilter 'wang' -> [{name:'wangwu',age:27}]
- * ex：[{name:'zhangsan',age:12},{name:'wangwu',age:27}] listFilter 27 -> [{name:'wangwu',age:27}]
- * ex：[{name:'zhangsan',age:12},{name:'wangwu',age:27}] listFilter 'an' -> [{name:'zhangsan',age:12},{name:'wangwu',age:27}]
- * ex：[{address:{road:'abc',street:'hjk'}}] listFilter 'b' -> [{address:{road:'abc',street:'hjk'}}]
- *
- * [or] object + object -> 判断源对象至少有一个值与目标对象的值相等或包含(按键所处路径比较)
- * ex：[{name:'zs',age:12},{name:'lisi',age:13}] listFilter {name:'li',age:12} -> [{name:'zs',age:12},{name:'lisi',age:13}]
- * ex：[{address:{road:'abc',street:'hjk'}}] listFilter {road:'ab'} -> []
- * ex：[{address:{road:'abc',street:'hjk'}}] listFilter {address:{road:'ab'}} -> [{address:{road:'abc',street:'hjk'}}]
- *
- * [and] object + object -> 判断源对象含有或相等所有目标对象的值(按键所处路径比较)
- * ex：[{name:'zs',age:12},{name:'lisi',age:13}] listFilter {name:'li',age:12} -> []
- * ex：[{name:'zs',age:12},{name:'lisi',age:13}] listFilter {name:'li',age:13} -> [{name:'lisi',age:13}]
- *
- * [any] object + array -> true，没有可比性
- *
- * [any] array + primitive -> 判断数组是否包含该值
- * ex：[[1,2],[2,3],[6,7]] listFilter 2 -> [[1,2],[2,3]]
- * ex：[['ab','bcd'],['cd','af'],[{name:'cd'}]] listFilter 'cd' -> [['cd','af']]
- *
- * [any] array + object -> true，没有可比性
- *
- * [any] array + array -> 判断源数组是否包含目标数组(数组值深度比较)
- * ex：[[1,2,3],[3,4],[1,3,8]] listFilter [3,1] -> [[1,2,3],[1,3,8]]
- * ex：[[{name:'zhangsan'},12],[{name:'lisi'},12]] listFilter [{name:'lisi'},12] -> [[{name:'lisi'},12]]
- */
-
 export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_filter_config');
 
 /**
@@ -66,13 +16,23 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
  * 02）支持异步流 Promise/Observable/EventEmitter，并增加 debounceTime
  * 03）与($and)，或($or)，非或($nor)，非($not)
  * 04）<($lt)，<=($lte)，>($gt)，>=($gte)
- * 05）
- * 06）在指定范围之内($in)，不在指定范围之内($nin)
- * 07）范围($range)
- * 08）数组包含指定值，全部包含($all)，包含任意一个($any)
- * 09）数组个数值或个数范围($size)
- * 10）数组内对象匹配($elemMatch)
- * 11）嵌入对象匹配，使用点记法(a.b.c)
+ * 05）在指定范围之内($in)，不在指定范围之内($nin)
+ * 06）范围($between)
+ * 07）相等比较($eq)
+ * 08）不相等($neq)
+ * 09）深度相等比较($deepEquals)
+ * 10）属性值不为undefined($exists)
+ * 11）正则($reg)
+ * 12）日期在之前($before)
+ * 13）日期在之后($after)
+ * 14）数组包含某值($contains)
+ * 15）数组包含全部($all)
+ * 16）数组包含任意($any)
+ * 17）数组长度或对象属性个数值($size)
+ * 18）取模($mod)
+ * 19）嵌入对象匹配，使用点记法(a.b.c)
+ * 20）数组内对象匹配($elemMatch)
+ * 21）自定义判断逻辑($cb)
  */
 @Injectable({
     providedIn: 'root'
@@ -82,7 +42,8 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
 })
 export class ListFilterPipe implements PipeTransform {
 
-    debounceTime: number = 400;
+    debounceTime = 400;
+    regFlags = 'i';
     valueGetter = valueGetter;
 
     private asyncStreams: Array<Observable<any>>;
@@ -91,10 +52,10 @@ export class ListFilterPipe implements PipeTransform {
 
     constructor(@Optional() @Inject(LIST_FILTER_CONFIG) config: ListFilterConfig) {
         Object.assign(this, config);
-        this.logicHandler = new LogicOperatorHandler(this.valueGetter);
+        this.logicHandler = new LogicOperatorHandler(this.regFlags, this.valueGetter);
     }
 
-    transform(list: any, filter: any) {
+    transform(list: any[], filter: any) {
         if (Array.isArray(list) && list.length && !isEmpty(filter)) {
             if (isNullOrUndefined(this.asyncStreams)) {
                 // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本，异步流会被特殊占位符替代
@@ -115,14 +76,14 @@ export class ListFilterPipe implements PipeTransform {
 
                         // 异步流占位符替换为真实数据
                         mapArray.forEach(map => {
-                            parsedFilter = ListFilterPipe.replaceFilterImageBak(parsedFilter, map);
+                            parsedFilter = ListFilterPipe.replaceFilterImage(parsedFilter, map);
                         });
 
-                        return this.logicHandler.match(list, parsedFilter);
+                        return list.filter(v => this.logicHandler.match(v, filter));
                     })
                 );
             } else {
-                return this.logicHandler.match(list, filter);
+                return list.filter(v => this.logicHandler.match(v, filter));
             }
         }
 
@@ -196,13 +157,13 @@ export class ListFilterPipe implements PipeTransform {
         return deepExtend(src, target);
     }
 
-    private static replaceFilterImageBak(target: any, map: { key: string, value: any }) {
+    private static replaceFilterImage(target: any, map: { key: string, value: any }) {
         if (isObject(target)) {
             for (let k of Object.keys(target)) {
                 if (target[ k ] === map.key) {
                     target[ k ] = map.value;
                 } else if (isObject(target[ k ]) || Array.isArray(target[ k ])) {
-                    this.replaceFilterImageBak(target[ k ], map);
+                    this.replaceFilterImage(target[ k ], map);
                 }
             }
         } else if (Array.isArray(target)) {
@@ -210,7 +171,7 @@ export class ListFilterPipe implements PipeTransform {
                 if (target[ i ] === map.key) {
                     target[ i ] = map.value;
                 } else if (isObject(target[ i ]) || Array.isArray(target[ i ])) {
-                    this.replaceFilterImageBak(target[ i ], map);
+                    this.replaceFilterImage(target[ i ], map);
                 }
             }
         } else if (target === map.key) {
