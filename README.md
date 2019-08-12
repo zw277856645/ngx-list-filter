@@ -28,10 +28,13 @@
 - 自定义判断逻辑($cb)
 
 ## 📦 安装
+
 > npm install ngx-list-filter --save
 
 ## 🔨 使用
+
 #### 引入module
+
 ``` js
 import { NgxListFilterModule } from 'ngx-list-filter';
 
@@ -48,6 +51,7 @@ export class AppModule {
 
 #### 1. 全局参数配置
 可在 module 中配置全局参数，使用示例如下
+
 ``` js
 @NgModule({
     ...
@@ -77,7 +81,8 @@ export class XxxModule {
 取值器，根据该方法获取 key 对应的 value。默认支持点记法(a.b.c)
 
 #### 2. 支持异步流（Promise/Observable/EventEmitter）
-可减少触发查询的次数，节省性能，使用示例如下
+已使用 debounceTime 减少触发查询的次数，默认值 400，可使用全局配置`debounceTime`修改，使用示例如下
+
 ``` html
 <input type="text" [(ngModel)]="xxx" #ctrl="ngModel">
 
@@ -87,6 +92,7 @@ export class XxxModule {
 #### 3. $and、$or、$nor、$not
 
 ##### a）最外层(尚没有具体属性)逻辑连接
+
 ``` html
 <!--
 下面三种方式等效
@@ -101,6 +107,7 @@ export class XxxModule {
 ```
 
 ##### b）某具体属性下的逻辑连接
+
 ``` html
 <!--
 下面三种方式等效
@@ -115,30 +122,38 @@ export class XxxModule {
 ```
 
 #### $lt、$lte、$gt、$gte
+
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{age:{$gte:30, $lte:80}}"></ng-container>
 ```
 
 #### $in、$nin
 
-##### a）指定值在指定范围之内
+##### a）原始类型值在指定范围之内
+
 ``` html
 <!-- age 是原始类型 -->
 <ng-container *ngFor="let rec of list | listFilter:{age:{$in:[28, 30, 60]}}"></ng-container>
 ```
 
-##### b）指定数组包含指定范围内的值
+##### b）数组包含指定范围内的值
+不推荐，请优先使用数组相关的操作符
+
 ``` html
 <!-- likes 是数组类型，注意只要数组包含任意一个筛选值即可，与 $any 操作符同效 -->
 <ng-container *ngFor="let rec of list | listFilter:{likes:{$in:['apple', 'banana']}}"></ng-container>
 ```
 
-#### $between
+#### $between（[m, n]）
+判断值大小在 m 到 n 之间，即 m < x < n
+
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{age:{$between:[20, 40]}}"></ng-container>
 ```
 
 #### $eq、$neq
+相等、不相等判断
+
 ``` html
 <!--
 下面两种方式等效
@@ -164,6 +179,101 @@ $eq 也可用于数组，但是只能使用一个原始类型的值，数组类�
 ```
 
 #### $deepEquals
-深度比较对象，如果系统已加载了`lodash`或`underscore`库，将使用它们的`isEqual`方法，否则简单使用`JSON.stringify`比较序列化后的字符串是否相等
+对象深度比较，如果系统已加载了`lodash`或`underscore`库，将使用它们的`isEqual`方法，否则简单使用`JSON.stringify`比较序列化后的字符串是否相等
 
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{addr:{$deepEquals:{street:'xxx', codes:['aaa','bbb']}}}"></ng-container>
+```
 
+#### $exists
+判断属性是否存在，值为`undefined`时视为不存在，其他任何值视为存在
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{children:{$exists:true}}"></ng-container>
+```
+
+#### $reg
+正则匹配，默认标志为`i`，即忽略大小写。可由全局配置`regFlags`修改
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{name:{$reg:'xxx'}}"></ng-container>
+```
+
+如果直接使用了正则，可省略 $reg 操作符
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{name:/xxx/i"></ng-container>
+```
+
+可使用 $flag 设置正则标志位，优先级高于全局配置
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{name:{$reg:'xxx', $flags:'ig'}}"></ng-container>
+```
+
+#### $before、$after
+日期比较，采用 Date.parse 解析日期字符串
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{birth:{$before:'2019/8/1 12:00:00'}}"></ng-container>
+<ng-container *ngFor="let rec of list | listFilter:{birth:{$before:1565544805000}}"></ng-container>
+```
+
+#### $contains
+判断数组是否包含某值
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$contains:'apple'}}"></ng-container>
+```
+
+#### $all
+判断数组是否包筛选数组全部的值
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$all:['apple', 'banana']}}"></ng-container>
+```
+
+#### $any
+判断数组是否包筛选数组任意一个值
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$any:['apple', 'banana']}}"></ng-container>
+```
+
+#### $size
+判断数组长度或对象属性个数为指定值
+
+``` html
+<!-- 数组长度 -->
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$size:3}}"></ng-container>
+
+<!-- 对象属性个数 -->
+<ng-container *ngFor="let rec of list | listFilter:{addr:{$size:3}}"></ng-container>
+```
+
+#### $mod（[m, n]）
+数字取模判断，x % m = n
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{age:{$mod:[2, 1]}}"></ng-container>
+```
+
+#### 点记法
+深度属性查找，使用全局配置的`valueGetter`获取健名对应的键值。默认实现的取值器可识别点记法，
+如：list = [ { addr: { street: 'xxx' } }, ... ]，当需要对 street 查找时，需使用 { 'addr.street': { $reg: 'xxx' } }
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{age:{$mod:[2, 1]}}"></ng-container>
+```
+
+#### $elemMatch
+数组对象匹配，当数组值为对象，且需要对其查询时使用，如：list = [ { users: [ { name: 'aaa' }, { name: 'bbb' } ] }, ... ]，
+对 name 查找时需使用 { users: { $eleMatch: { name: { $reg: 'xxx' } } } }。
+注意 $eleMatch 中可使用任意前面提及的操作符，包括 $eleMatch 本身
+
+#### cb
+自定义判断逻辑，当插件所提供的操作符无法满足需求时使用
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{age:{$cb:logicFunction}}"></ng-container>
+```
