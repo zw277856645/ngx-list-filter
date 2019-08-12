@@ -32,8 +32,7 @@
 > npm install ngx-list-filter --save
 
 ## 🔨 使用
-
-#### 引入module
+引入module
 
 ``` js
 import { NgxListFilterModule } from 'ngx-list-filter';
