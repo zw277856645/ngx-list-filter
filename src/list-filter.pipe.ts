@@ -34,6 +34,13 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
  * 20）数组内对象匹配($elemMatch)
  * 21）自定义判断逻辑($cb)
  */
+
+/**
+ * @dynamic
+ *
+ * ng-packagr 的 tsconfig.json 配置 strictMetadataEmit 会禁止 static 方法使用 lambda 表达式，
+ * 使用此标记解除编译错误
+ */
 @Injectable({
     providedIn: 'root'
 })
