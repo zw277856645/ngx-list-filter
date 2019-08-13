@@ -40,7 +40,7 @@
     "rxjs": "^6.5.1"
   },
   "dependencies": {
-    "cmjs-lib": "0.3.0"
+    "cmjs-lib": "*"
   },
   "devDependencies": {
     "@angular/common": "8.1.2",
