@@ -1,13 +1,13 @@
 import { ListFilterPipe } from './list-filter.pipe';
 import { data, data_0, data_1, data_2, data_3, data_4, data_5 } from './data';
 import { TestBed } from '@angular/core/testing';
-import { NgxListFilterModule } from './ngx-list-filter.module';
+import { ListFilterModule } from './list-filter.module';
 
 describe('list filter pipe', () => {
     let pipe: ListFilterPipe;
 
     beforeEach(() => {
-        TestBed.configureTestingModule({ imports: [ NgxListFilterModule ] });
+        TestBed.configureTestingModule({ imports: [ ListFilterModule ] });
         pipe = TestBed.get(ListFilterPipe);
     });
 

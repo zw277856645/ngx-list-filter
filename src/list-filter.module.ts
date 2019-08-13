@@ -9,5 +9,5 @@ import { ListFilterPipe } from './list-filter.pipe';
         ListFilterPipe
     ]
 })
-export class NgxListFilterModule {
+export class ListFilterModule {
 }
