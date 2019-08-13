@@ -14,7 +14,7 @@
 - 相等比较($eq)
 - 不相等($neq)
 - 深度相等比较($deepEquals)
-- 属性值不为undefined($exists)
+- 属性值存不为 null、undefined、空字符串、空数组($exists)
 - 正则($reg)
 - 日期在之前($before)
 - 日期在之后($after)
@@ -85,8 +85,9 @@ export class XxxModule {
 ``` html
 <input type="text" [(ngModel)]="xxx" #ctrl="ngModel">
 
-<ng-container *ngFor="let rec of list | listFilter:{name:ctrl.valueChanges}"></ng-container>
+<ng-container *ngFor="let rec of list | listFilter:{name:ctrl.valueChanges} | async"></ng-container>
 ```
+> PS：表达式中如果含有异步流，需要在管道后加`async`
 
 #### 3. $and、$or、$nor、$not
 
@@ -131,7 +132,12 @@ export class XxxModule {
 ##### a）原始类型值在指定范围之内
 
 ``` html
-<!-- age 是原始类型 -->
+<!--
+age 是原始类型
+
+下面两种方式等效，筛选条件为数组时，$in 可省略（不推荐）
+-->
+<ng-container *ngFor="let rec of list | listFilter:{age:[28, 30, 60]}"></ng-container>
 <ng-container *ngFor="let rec of list | listFilter:{age:{$in:[28, 30, 60]}}"></ng-container>
 ```
 
@@ -165,16 +171,14 @@ export class XxxModule {
 <ng-container *ngFor="let rec of list | listFilter:{name:{$eq:'xxx'}}"></ng-container>
 ```
 
-$eq 也可用于数组，但是只能使用一个原始类型的值，数组类型无效，功能等效于操作符 $contains
+$eq 也可用于数组，但是只能使用原始类型的筛选值，功能等效于操作符 $contains
 
 ``` html
-<!-- 下面三种方式等效，推荐使用 $contains，使语义更明确 -->
+<!-- 下面四种方式等效，推荐使用 $contains，使语义更明确 -->
 <ng-container *ngFor="let rec of list | listFilter:{likes:'apple'}"></ng-container>
 <ng-container *ngFor="let rec of list | listFilter:{likes:{$eq:'apple'}}"></ng-container>
 <ng-container *ngFor="let rec of list | listFilter:{likes:{$contains:'apple'}}"></ng-container>
-
-<!-- 此使用方式无效，请使用数组相关的操作符 -->
-<ng-container *ngFor="let rec of list | listFilter:{likes:{$eq:['apple', 'banana']}}"></ng-container>
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$in:['apple']}}"></ng-container>
 ```
 
 #### $deepEquals
@@ -185,7 +189,7 @@ $eq 也可用于数组，但是只能使用一个原始类型的值，数组类�
 ```
 
 #### $exists
-判断属性是否存在，值为`undefined`时视为不存在，其他任何值视为存在
+判断属性是否存在，属性值存不为 null、undefined、空字符串、空数组 时视为存在
 
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{children:{$exists:true}}"></ng-container>

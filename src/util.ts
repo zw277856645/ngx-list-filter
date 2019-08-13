@@ -1,3 +1,21 @@
+export function isPrimitive(value: any) {
+    return (typeof value !== 'object' && typeof value !== 'function') || value === null;
+}
+
+export function isPrimitiveArray(value: any) {
+    if (!Array.isArray(value)) {
+        return false;
+    }
+
+    for (let v of value) {
+        if (!isPrimitive(v)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 export function isObject(v: any) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
@@ -53,3 +71,20 @@ export function convert2Array(a: any) {
 
     return rows;
 }
+
+export function nullValue(value: any) {
+    if (isEmpty(value)) {
+        return true;
+    } else if (Array.isArray(value)) {
+        for (let v of value) {
+            if (!nullValue(v)) {
+                return false;
+            }
+        }
+
+        return true;
+    } else {
+        return false;
+    }
+}
+

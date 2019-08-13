@@ -11,10 +11,74 @@ describe('list filter pipe', () => {
         pipe = TestBed.get(ListFilterPipe);
     });
 
+    describe('test deleteNullConstraints', () => {
+        let caller: Function;
+
+        beforeEach(() => caller = spyOn(ListFilterPipe, 'deleteNullConstraints').and.callThrough());
+
+        it('test deleteNullConstraints', function () {
+            expect(caller.call(
+                ListFilterPipe,
+                {
+                    $or: {
+                        age: { $gt: 228, $lt: null },
+                        name: null
+                    },
+                    $and: [
+                        { age: { $gt: null } },
+                        { name: null }
+                    ],
+                    sex: null,
+                    loves: {
+                        $in: [],
+                        $eleMatch: {
+                            age: { $gt: 228, $lt: null },
+                            name: null,
+                            $nor: {
+                                sex: null,
+                                desc: 'aa',
+                                loves: [ null ],
+                                label: {
+                                    $lt: null
+                                }
+                            }
+                        }
+                    },
+                    age: {
+                        $between: [ null, 12 ],
+                        $in: [ null, undefined ]
+                    }
+                }
+            )).toEqual(
+                {
+                    $or: {
+                        age: { $gt: 228 }
+                    },
+                    loves: {
+                        $eleMatch: {
+                            age: { $gt: 228 },
+                            $nor: {
+                                desc: 'aa',
+                            }
+                        }
+                    },
+                    age: {
+                        $between: [ null, 12 ]
+                    }
+                }
+            );
+        });
+    });
+
     describe('比较操作符', () => {
-        it('null、undefined、空字符串', () => {
-            expect(pipe.transform(data, { name: '' })).toEqual([ data_3, data_4, data_5 ]);
-            expect(pipe.transform(data, { name: 'xxx' })).toEqual([]);
+        it('查询条件为空时，返回所有', () => {
+            expect(pipe.transform(data, { age: { $lt: undefined }, name: null })).toEqual(data);
+            expect(pipe.transform(data, { loves: { $in: [] } })).toEqual(data);
+            expect(pipe.transform(data, { loves: { $nin: null } })).toEqual(data);
+            expect(pipe.transform(data, { name: { $not: { $exists: null } } })).toEqual(data);
+            expect(pipe.transform(data, { families: { $elemMatch: { age: { $gt: null } } } })).toEqual(data);
+            expect(pipe.transform(data, { $or: { age: { $lt: null }, id: null } })).toEqual(data);
+            expect(pipe.transform(data, { $not: { age: { $lt: null } } })).toEqual(data);
         });
 
         it('$lt、$lte、$gt、$gte', () => {
@@ -24,8 +88,11 @@ describe('list filter pipe', () => {
 
         it('$in、$nin', () => {
             expect(pipe.transform(data, { age: { $in: [ 28, '77', 200 ] } })).toEqual([ data_1, data_2 ]);
-            expect(pipe.transform(data, { name: { $nin: [ '张三', '李四', '王五', null ] } })).toEqual([ data_1 ]);
+            expect(pipe.transform(data, { name: { $nin: [ '张三', '李四', '王五', null ] } }))
+                .toEqual([ data_1, data_3 ]);
 
+            expect(pipe.transform(data, { loves: [ '苹果' ] }))
+                .toEqual([ data_0, data_1 ], '筛选值为数组时，省略操作符默认为 $in');
             expect(pipe.transform(data, { loves: { $in: [ '苹果' ] } })).toEqual([ data_0, data_1 ]);
             expect(pipe.transform(data, { loves: { $in: [ '苹果', '橘子' ] } }))
                 .toEqual([ data_0, data_1, data_3, data_4, data_5 ]);
@@ -45,11 +112,8 @@ describe('list filter pipe', () => {
 
             expect(pipe.transform(data, { loves: '苹果' })).toEqual([ data_0, data_1 ]);
             expect(pipe.transform(data, { loves: { $eq: '苹果' } })).toEqual([ data_0, data_1 ]);
-
-            expect(pipe.transform(data, { loves: [ '苹果', '橘子' ] }))
-                .toEqual([ data_0, data_1, data_3, data_4, data_5 ], '相当于 $in');
-            expect(pipe.transform(data, { loves: { $eq: [ '苹果', '橘子' ] } }))
-                .toEqual([], '不符合规则，需使用数组相关操作符');
+            expect(pipe.transform(data, { loves: { $in: [ '苹果' ] } })).toEqual([ data_0, data_1 ]);
+            expect(pipe.transform(data, { loves: { $contains: '苹果' } })).toEqual([ data_0, data_1 ]);
 
             expect(pipe.transform(data, { date: '2019/8/12 1:34:55' })).toEqual([ data_0, data_1 ]);
             expect(pipe.transform(data, { date: new Date('2019/8/12 1:34:55') })).toEqual([ data_0, data_1 ]);
@@ -58,8 +122,10 @@ describe('list filter pipe', () => {
 
         it('$neq', () => {
             expect(pipe.transform(data, { age: { $neq: 12 } })).toEqual([ data_1, data_2, data_3 ]);
+
             expect(pipe.transform(data, { loves: { $neq: '橘子' } })).toEqual([ data_1, data_2 ]);
-            expect(pipe.transform(data, { loves: { $neq: [ '苹果', '橘子' ] } })).toEqual([ data_2 ], '相当于 $nin');
+            expect(pipe.transform(data, { loves: { $nin: [ '橘子' ] } })).toEqual([ data_1, data_2 ]);
+            expect(pipe.transform(data, { loves: { $not: { $contains: '橘子' } } })).toEqual([ data_1, data_2 ]);
         });
 
         it('$deepEquals', () => {
@@ -70,7 +136,10 @@ describe('list filter pipe', () => {
 
         it('$exists', () => {
             expect(pipe.transform(data, { name: { $exists: true } }))
-                .toEqual([ data_0, data_1, data_2, data_3, data_4 ]);
+                .toEqual([ data_0, data_1, data_2 ]);
+            expect(pipe.transform(data, { name: { $exists: false } }))
+                .toEqual([ data_3, data_4, data_5 ]);
+
             expect(pipe.transform(data, { 'addr.rooms': { $exists: true } })).toEqual([ data_0 ]);
             expect(pipe.transform(data, { 'addr.rooms': { $exists: false } }))
                 .toEqual([ data_1, data_2, data_3, data_4, data_5 ]);

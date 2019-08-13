@@ -65,4 +65,5 @@ export class LogicOperatorHandler {
 
         return true;
     }
+
 }

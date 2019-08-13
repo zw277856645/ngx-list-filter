@@ -3,7 +3,9 @@ import { combineLatest, Observable } from 'rxjs';
 import { debounceTime, map, shareReplay, startWith } from 'rxjs/operators';
 import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
-import { clone, isEmpty, isNullOrUndefined, isObject, valueGetter } from './util';
+import {
+    clone, isEmpty, isNullOrUndefined, isObject, isPrimitiveArray, nullValue, valueGetter
+} from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
 
 export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_filter_config');
@@ -21,7 +23,7 @@ export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_fil
  * 07）相等比较($eq)
  * 08）不相等($neq)
  * 09）深度相等比较($deepEquals)
- * 10）属性值不为undefined($exists)
+ * 10）属性值存不为 null、undefined、空字符串、空数组($exists)
  * 11）正则($reg)
  * 12）日期在之前($before)
  * 13）日期在之后($after)
@@ -86,15 +88,26 @@ export class ListFilterPipe implements PipeTransform {
                             parsedFilter = ListFilterPipe.replaceFilterImage(parsedFilter, map);
                         });
 
-                        return list.filter(v => this.logicHandler.match(v, filter));
+                        return this.doSearch(list, parsedFilter);
                     })
                 );
             } else {
-                return list.filter(v => this.logicHandler.match(v, filter));
+                return this.doSearch(list, filter);
             }
         }
 
         return list;
+    }
+
+    private doSearch(list: any[], filter: any) {
+        // 去除空查询条件
+        let parsedFilter = ListFilterPipe.deleteNullConstraints(filter);
+
+        if (!isEmpty(parsedFilter)) {
+            return list.filter(v => this.logicHandler.match(v, parsedFilter));
+        } else {
+            return list;
+        }
     }
 
     private static getAsyncsAndCreateFilterImage(obj: any) {
@@ -186,6 +199,46 @@ export class ListFilterPipe implements PipeTransform {
         }
 
         return target;
+    }
+
+    private static deleteNullConstraints(constraint: any): any {
+        let copy = null;
+
+        if (Array.isArray(constraint)) {
+            if (!isPrimitiveArray(constraint)) {
+                for (let c of constraint) {
+                    let ret = this.deleteNullConstraints(c);
+                    if (ret !== null) {
+                        if (!copy) {
+                            copy = [];
+                        }
+
+                        copy.push(ret);
+                    }
+                }
+            } else if (!nullValue(constraint)) {
+                copy = constraint;
+            }
+        } else if (isObject(constraint)) {
+            if (constraint instanceof RegExp || constraint instanceof Date) {
+                copy = constraint;
+            } else {
+                for (let k of Object.keys(constraint)) {
+                    let ret = this.deleteNullConstraints(constraint[ k ]);
+                    if (ret !== null) {
+                        if (!copy) {
+                            copy = {};
+                        }
+
+                        copy[ k ] = ret;
+                    }
+                }
+            }
+        } else if (!nullValue(constraint)) {
+            copy = constraint;
+        }
+
+        return copy;
     }
 
 }
