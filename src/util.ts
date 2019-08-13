@@ -87,4 +87,3 @@ export function nullValue(value: any) {
         return false;
     }
 }
-
