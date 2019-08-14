@@ -76,6 +76,8 @@ export class ListFilterPipe implements PipeTransform {
             // 含有异步监听器
             if (this.asyncStreams.length) {
                 return combineLatest(this.asyncStreams).pipe(
+                    // 屏蔽多个流同时发送数据触发多次
+                    debounceTime(0),
                     map((mapArray: any[]) => {
                         let parsedFilter = clone(this.filterImage);
 
