@@ -68,7 +68,7 @@ export class ListFilterPipe implements PipeTransform {
         if (Array.isArray(list) && list.length && !isEmpty(filter)) {
             if (isNullOrUndefined(this.asyncStreams)) {
                 // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本，异步流会被特殊占位符替代
-                let [ asyncs, image ] = ListFilterPipe.getAsyncsAndCreateFilterImage(filter);
+                let [ asyncs, image ] = this.getAsyncsAndCreateFilterImage(filter);
                 this.asyncStreams = asyncs;
                 this.filterImage = image;
             }
@@ -76,7 +76,6 @@ export class ListFilterPipe implements PipeTransform {
             // 含有异步监听器
             if (this.asyncStreams.length) {
                 return combineLatest(this.asyncStreams).pipe(
-                    debounceTime(this.debounceTime),
                     map((mapArray: any[]) => {
                         let parsedFilter = clone(this.filterImage);
 
@@ -110,7 +109,7 @@ export class ListFilterPipe implements PipeTransform {
         }
     }
 
-    private static getAsyncsAndCreateFilterImage(obj: any) {
+    private getAsyncsAndCreateFilterImage(obj: any) {
         let asyncs: Array<Observable<any>> = [];
         let image: any;
 
@@ -119,7 +118,7 @@ export class ListFilterPipe implements PipeTransform {
 
             for (let k of Object.keys(obj)) {
                 if (obj[ k ] instanceof Promise || obj[ k ] instanceof Observable) {
-                    image[ k ] = this.generateKey();
+                    image[ k ] = ListFilterPipe.generateKey();
                     asyncs.push(this.generateObservable(obj[ k ], image[ k ]));
                 } else if (isObject(obj[ k ]) || Array.isArray(obj[ k ])) {
                     let [ asyncsOuter, imageOuter ] = this.getAsyncsAndCreateFilterImage(obj[ k ]);
@@ -134,7 +133,7 @@ export class ListFilterPipe implements PipeTransform {
 
             for (let v of obj) {
                 if (v instanceof Promise || v instanceof Observable) {
-                    let k = this.generateKey();
+                    let k = ListFilterPipe.generateKey();
                     image.push(k);
                     asyncs.push(this.generateObservable(v, k));
                 } else if (isObject(v) || Array.isArray(v)) {
@@ -147,7 +146,7 @@ export class ListFilterPipe implements PipeTransform {
             }
         } else {
             if (obj instanceof Promise || obj instanceof Observable) {
-                image = this.generateKey();
+                image = ListFilterPipe.generateKey();
                 asyncs.push(this.generateObservable(obj, image));
             } else {
                 image = obj;
@@ -161,10 +160,11 @@ export class ListFilterPipe implements PipeTransform {
         return '__' + uuid(8) + '__';
     }
 
-    private static generateObservable(stream: Observable<any> | Promise<any>, key: string) {
+    private generateObservable(stream: Observable<any> | Promise<any>, key: string) {
         return async2Observable(stream).pipe(
             startWith(null),
             map(value => ({ key, value })),
+            debounceTime(this.debounceTime),
             shareReplay(1)
         );
     }
