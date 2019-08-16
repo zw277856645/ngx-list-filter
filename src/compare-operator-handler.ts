@@ -20,10 +20,14 @@ export class CompareOperatorHandler {
                 return this.$eq(value, constraint.getTime());
             } else {
                 if (constraint.$reg) {
-                    return this.$reg(
-                        value,
-                        new RegExp(constraint.$reg, constraint.$flags || this.logicHandler.regFlags)
-                    );
+                    try {
+                        return this.$reg(
+                            value,
+                            new RegExp(constraint.$reg, constraint.$flags || this.logicHandler.regFlags)
+                        );
+                    } catch (e) {
+                        return CompareOperatorHandler.stringContains(value, constraint.$reg);
+                    }
                 }
 
                 for (let key in constraint) {
@@ -241,6 +245,18 @@ export class CompareOperatorHandler {
             return value.getTime();
         } else {
             return value;
+        }
+    }
+
+    private static stringContains(value: any, constraint: any) {
+        if (Array.isArray(value)) {
+            for (let v of value) {
+                if (String(v).toLowerCase().includes(String(constraint).toLowerCase())) {
+                    return true;
+                }
+            }
+        } else {
+            return String(value).toLowerCase().includes(String(constraint).toLowerCase());
         }
     }
 
