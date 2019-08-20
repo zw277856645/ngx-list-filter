@@ -1,11 +1,9 @@
 import { Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform } from '@angular/core';
-import { combineLatest, Observable } from 'rxjs';
-import { debounceTime, map, shareReplay, startWith } from 'rxjs/operators';
+import { combineLatest, Observable, Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, map, shareReplay, startWith, switchMap } from 'rxjs/operators';
 import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
-import {
-    clone, isEmpty, isNullOrUndefined, isObject, isPrimitiveArray, nullValue, valueGetter
-} from './util';
+import { clone, isEmpty, isNullOrUndefined, isObject, isPrimitiveArray, nullValue, valueGetter } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
 
 export const LIST_FILTER_CONFIG = new InjectionToken<ListFilterConfig>('list_filter_config');
@@ -58,6 +56,8 @@ export class ListFilterPipe implements PipeTransform {
     private asyncStreams: Array<Observable<any>>;
     private filterImage: any;
     private logicHandler: LogicOperatorHandler;
+    private reTransSubject = new Subject();
+    private lastList: any[];
 
     constructor(@Optional() @Inject(LIST_FILTER_CONFIG) config: ListFilterConfig) {
         Object.assign(this, config);
@@ -73,11 +73,35 @@ export class ListFilterPipe implements PipeTransform {
                 this.filterImage = image;
             }
 
-            // 含有异步监听器
             if (this.asyncStreams.length) {
-                return combineLatest(this.asyncStreams).pipe(
-                    // 屏蔽多个流同时发送数据触发多次
-                    debounceTime(0),
+                return this.reTransSubject.pipe(
+                    startWith(false),
+                    distinctUntilChanged(),
+                    switchMap(secondTime => {
+                        if (!secondTime) {
+                            let count = 0;
+
+                            // 静态参数变化，第一次立即执行过滤，第二次异步数据到来前先切换流
+                            // PS：第二次数据必定为异步数据，因为同步数据会重新订阅，又重新开始了
+                            return combineLatest(this.asyncStreams).pipe(
+                                debounceTime(0),
+                                map(res => {
+                                    if (++count === 2) {
+                                        this.reTransSubject.next(true);
+                                    }
+
+                                    return res;
+                                })
+                            );
+                        } else {
+                            return combineLatest(
+                                this.asyncStreams.map(stream => {
+                                    return stream.pipe(debounceTime(this.debounceTime));
+                                })
+                            ).pipe(debounceTime(0));
+                        }
+                    })
+                ).pipe(
                     map((mapArray: any[]) => {
                         let parsedFilter = clone(this.filterImage);
 
@@ -90,7 +114,10 @@ export class ListFilterPipe implements PipeTransform {
                         });
 
                         return this.doSearch(list, parsedFilter);
-                    })
+                    }),
+
+                    // 消除 debounceTime(0) 带来的短暂空数据期
+                    startWith(this.lastList)
                 );
             } else {
                 return this.doSearch(list, filter);
@@ -105,13 +132,15 @@ export class ListFilterPipe implements PipeTransform {
         let parsedFilter = ListFilterPipe.deleteNullConstraints(filter);
 
         if (!isEmpty(parsedFilter)) {
-            return list.filter(v => this.logicHandler.match(v, parsedFilter));
+            this.lastList = list.filter(v => this.logicHandler.match(v, parsedFilter));
         } else {
-            return list;
+            this.lastList = list;
         }
+
+        return this.lastList;
     }
 
-    private getAsyncsAndCreateFilterImage(obj: any) {
+    private getAsyncsAndCreateFilterImage(obj: any): [ Array<Observable<any>>, any ] {
         let asyncs: Array<Observable<any>> = [];
         let image: any;
 
@@ -166,7 +195,6 @@ export class ListFilterPipe implements PipeTransform {
         return async2Observable(stream).pipe(
             startWith(null),
             map(value => ({ key, value })),
-            debounceTime(this.debounceTime),
             shareReplay(1)
         );
     }
