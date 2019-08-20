@@ -189,7 +189,7 @@ $eq 也可用于数组，但是只能使用原始类型的筛选值，功能等�
 ```
 
 #### $exists
-判断属性是否存在，属性值存不为 null、undefined、空字符串、空数组 时视为存在
+判断属性是否存在，属性值不为 null、undefined、空字符串、空数组 时视为存在
 
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{children:{$exists:true}}"></ng-container>
@@ -265,9 +265,6 @@ $eq 也可用于数组，但是只能使用原始类型的筛选值，功能等�
 深度属性查找，使用全局配置的`valueGetter`获取健名对应的键值。默认实现的取值器可识别点记法，
 如：list = [ { addr: { street: 'xxx' } }, ... ]，当需要对 street 查找时，需使用 { 'addr.street': { $reg: 'xxx' } }
 
-``` html
-<ng-container *ngFor="let rec of list | listFilter:{age:{$mod:[2, 1]}}"></ng-container>
-```
 
 #### $elemMatch
 数组对象匹配，当数组值为对象，且需要对其查询时使用，如：list = [ { users: [ { name: 'aaa' }, { name: 'bbb' } ] }, ... ]，
