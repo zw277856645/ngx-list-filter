@@ -214,6 +214,12 @@ $eq 也可用于数组，但是只能使用原始类型的筛选值，功能等�
 <ng-container *ngFor="let rec of list | listFilter:{name:{$reg:'xxx', $flags:'ig'}}"></ng-container>
 ```
 
+$reg 也可用于数组，数组中任意一个元素匹配成功即可
+
+``` html
+<ng-container *ngFor="let rec of list | listFilter:{likes:{$reg:'xxx'}}"></ng-container>
+```
+
 #### $before、$after
 日期比较，采用 Date.parse 解析日期字符串
 
@@ -223,7 +229,7 @@ $eq 也可用于数组，但是只能使用原始类型的筛选值，功能等�
 ```
 
 #### $contains
-判断数组是否包含某值
+判断数组是否包含某值，注意是相等比较，若需部分匹配字符串，请使用 $reg
 
 ``` html
 <ng-container *ngFor="let rec of list | listFilter:{likes:{$contains:'apple'}}"></ng-container>
