@@ -35,11 +35,11 @@
 引入module
 
 ``` js
-import { NgxListFilterModule } from 'ngx-list-filter';
+import { ListFilterModule } from 'ngx-list-filter';
 
 @NgModule({
     imports: [
-        NgxListFilterModule
+        ListFilterModule
     ]
 })
 export class AppModule {
