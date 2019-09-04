@@ -65,7 +65,7 @@ export class ListFilterPipe implements PipeTransform {
     }
 
     transform(list: any[], filter: any) {
-        if (Array.isArray(list) && list.length && !isEmpty(filter)) {
+        if (Array.isArray(list) && !isEmpty(filter)) {
             if (isNullOrUndefined(this.asyncStreams)) {
                 // 第一次执行保存异步流引用，创建 filter 去除异步流后的镜像副本，异步流会被特殊占位符替代
                 let [ asyncs, image ] = this.getAsyncsAndCreateFilterImage(filter);

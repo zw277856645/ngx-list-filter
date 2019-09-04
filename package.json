@@ -1,6 +1,6 @@
 {
   "name": "ngx-list-filter",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "angular list filter",
   "scripts": {
     "build": "ng-packagr -p package.json",
