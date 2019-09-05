@@ -32,7 +32,7 @@
     "mongo",
     "mongodb"
   ],
-  "author": "",
+  "author": "wei.zhang",
   "license": "MIT",
   "peerDependencies": {
     "@angular/core": "^8.1.2",
