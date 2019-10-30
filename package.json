@@ -16,7 +16,7 @@
       "entryFile": "public_api.ts"
     },
     "whitelistedNonPeerDependencies": [
-      "cmjs-lib"
+      "@demacia/cmjs-lib"
     ]
   },
   "repository": {
