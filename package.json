@@ -43,6 +43,7 @@
     "@demacia/cmjs-lib": "0.0.1"
   },
   "devDependencies": {
+    "@angular/animations": "8.1.2",
     "@angular/common": "8.1.2",
     "@angular/core": "8.1.2",
     "@angular/platform-browser": "8.1.2",
