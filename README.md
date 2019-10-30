@@ -29,13 +29,13 @@
 
 ## 📦 安装
 
-> npm install ngx-list-filter --save
+> npm install @demacia/ngx-list-filter --save
 
 ## 🔨 使用
 引入module
 
 ``` js
-import { ListFilterModule } from 'ngx-list-filter';
+import { ListFilterModule } from '@demacia/ngx-list-filter';
 
 @NgModule({
     imports: [

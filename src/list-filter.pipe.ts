@@ -1,7 +1,7 @@
 import { Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform } from '@angular/core';
 import { combineLatest, Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, shareReplay, startWith, switchMap } from 'rxjs/operators';
-import { async2Observable, deepExtend, uuid } from 'cmjs-lib';
+import { async2Observable, deepExtend, uuid } from '@demacia/cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
 import { clone, isEmpty, isNullOrUndefined, isObject, isPrimitiveArray, nullValue, valueGetter } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
