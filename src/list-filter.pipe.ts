@@ -1,7 +1,7 @@
 import { Inject, Injectable, InjectionToken, Optional, Pipe, PipeTransform } from '@angular/core';
 import { combineLatest, Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, shareReplay, startWith, switchMap } from 'rxjs/operators';
-import { async2Observable, deepExtend, uuid } from '@demacia/cmjs-lib';
+import { async2Observable, uuid } from '@demacia/cmjs-lib';
 import { ListFilterConfig } from './list-filter-config';
 import { clone, isEmpty, isNullOrUndefined, isObject, isPrimitiveArray, nullValue, valueGetter } from './util';
 import { LogicOperatorHandler } from './logic-operator-handler';
@@ -106,11 +106,11 @@ export class ListFilterPipe implements PipeTransform {
                         let parsedFilter = clone(this.filterImage);
 
                         // 继承非异步流参数
-                        parsedFilter = ListFilterPipe.extendStaticParams(parsedFilter, filter);
+                        ListFilterPipe.extendStaticParams(parsedFilter, filter);
 
                         // 异步流占位符替换为真实数据
                         mapArray.forEach(map => {
-                            parsedFilter = ListFilterPipe.replaceFilterImage(parsedFilter, map);
+                            ListFilterPipe.replaceFilterImage(parsedFilter, map);
                         });
 
                         return this.doSearch(list, parsedFilter);
@@ -200,11 +200,27 @@ export class ListFilterPipe implements PipeTransform {
     }
 
     private static extendStaticParams(target: any, src: any) {
-        if (src instanceof Promise || src instanceof Observable) {
-            return target;
+        if (!src || src instanceof Promise || src instanceof Observable) {
+            return;
         }
 
-        return deepExtend(target, src);
+        if (isObject(target)) {
+            for (let k of Object.keys(target)) {
+                if (isObject(target[ k ]) || Array.isArray(target[ k ])) {
+                    this.extendStaticParams(target[ k ], src[ k ]);
+                } else if (!(src[ k ] instanceof Promise || src[ k ] instanceof Observable)) {
+                    target[ k ] = src[ k ];
+                }
+            }
+        } else if (Array.isArray(target)) {
+            for (let i = 0, len = target.length; i < len; i++) {
+                if (isObject(target[ i ]) || Array.isArray(target[ i ])) {
+                    this.extendStaticParams(target[ i ], src[ i ]);
+                } else if (!(src[ i ] instanceof Promise || src[ i ] instanceof Observable)) {
+                    target[ i ] = src[ i ];
+                }
+            }
+        }
     }
 
     private static replaceFilterImage(target: any, map: { key: string, value: any }) {
@@ -224,11 +240,7 @@ export class ListFilterPipe implements PipeTransform {
                     this.replaceFilterImage(target[ i ], map);
                 }
             }
-        } else if (target === map.key) {
-            return map.value;
         }
-
-        return target;
     }
 
     private static deleteNullConstraints(constraint: any): any {

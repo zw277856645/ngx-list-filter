@@ -1,6 +1,6 @@
 {
   "name": "@demacia/ngx-list-filter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "angular list filter",
   "scripts": {
     "build": "ng-packagr -p package.json",

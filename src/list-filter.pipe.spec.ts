@@ -1,7 +1,8 @@
 import { ListFilterPipe } from './list-filter.pipe';
-import { data, data_0, data_1, data_2, data_3, data_4, data_5 } from './data';
 import { TestBed } from '@angular/core/testing';
 import { ListFilterModule } from './list-filter.module';
+import { EventEmitter } from '@angular/core';
+import { data, data_0, data_1, data_2, data_3, data_4, data_5 } from './data';
 
 describe('list filter pipe', () => {
     let pipe: ListFilterPipe;
@@ -11,12 +12,59 @@ describe('list filter pipe', () => {
         pipe = TestBed.get(ListFilterPipe);
     });
 
+    describe('test extendStaticParams', () => {
+        let caller: Function;
+
+        beforeEach(() => caller = spyOn(ListFilterPipe, 'extendStaticParams').and.callThrough());
+
+        it('test extendStaticParams', () => {
+            let target: any = {
+                    age: null,
+                    sex: null,
+                    father: 'zhang san',
+                    name: {
+                        $reg: 'name',
+                        likes: {
+                            $all: 'xxx'
+                        }
+                    },
+                    loves: [ 1, 'xxx', null, { $in: 'hh' } ]
+                },
+                src: any = {
+                    age: 123,
+                    sex: undefined,
+                    father: null,
+                    name: {
+                        $reg: new EventEmitter(),
+                        likes: {
+                            $all: new EventEmitter()
+                        }
+                    },
+                    loves: [ 2, 'yyy', new EventEmitter(), { $in: new EventEmitter() } ]
+                };
+
+            caller.call(ListFilterPipe, target, src);
+            expect(target).toEqual({
+                age: 123,
+                sex: undefined,
+                father: null,
+                name: {
+                    $reg: 'name',
+                    likes: {
+                        $all: 'xxx'
+                    }
+                },
+                loves: [ 2, 'yyy', null, { $in: 'hh' } ]
+            });
+        });
+    });
+
     describe('test deleteNullConstraints', () => {
         let caller: Function;
 
         beforeEach(() => caller = spyOn(ListFilterPipe, 'deleteNullConstraints').and.callThrough());
 
-        it('test deleteNullConstraints', function () {
+        it('test deleteNullConstraints', () => {
             expect(caller.call(
                 ListFilterPipe,
                 {
