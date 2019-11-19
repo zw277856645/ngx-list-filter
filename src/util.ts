@@ -32,19 +32,6 @@ export function isEmpty(v: any) {
     return isNullOrUndefined(v) || isEmptyString(v);
 }
 
-export function clone(obj: any) {
-    if (!obj) {
-        return obj;
-    }
-
-    let str = JSON.stringify(obj);
-    if (str) {
-        return JSON.parse(str);
-    }
-
-    return obj;
-}
-
 export type ValueGetter = (obj: any, key: string) => any;
 
 export function valueGetter(obj: any, key: string) {

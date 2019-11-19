@@ -6,7 +6,6 @@
 
 ## ✨ 插件特性
 - 全局参数配置
-- 支持异步流 Promise/Observable/EventEmitter，并增加 debounceTime
 - 与($and)，或($or)，非或($nor)，非($not)
 - <($lt)，<=($lte)，>($gt)，>=($gte)
 - 在指定范围之内($in)，不在指定范围之内($nin)
@@ -59,7 +58,6 @@ export class AppModule {
         {
             provide: LIST_FILTER_CONFIG,
             useValue: {
-                debounceTime: 300,
                 regFlags: 'gmi',
                 valueGetter: (obj: any, key: string) => obj[key]
             }
@@ -70,26 +68,13 @@ export class XxxModule {
 }
 ```
 
-##### debounceTime
-异步流抖动时间(ms)，默认值`400`
-
 ##### regFlags
 正则匹配标志，默认值`i`
 
 ##### valueGetter
 取值器，根据该方法获取 key 对应的 value。默认支持点记法(a.b.c)
 
-#### 2. 支持异步流（Promise/Observable/EventEmitter）
-已使用 debounceTime 减少触发查询的次数，默认值 400，可使用全局配置`debounceTime`修改，使用示例如下
-
-``` html
-<input type="text" [(ngModel)]="xxx" #ctrl="ngModel">
-
-<ng-container *ngFor="let rec of list | listFilter:{name:ctrl.valueChanges} | async"></ng-container>
-```
-> PS：表达式中如果含有异步流，需要在管道后加`async`
-
-#### 3. $and、$or、$nor、$not
+#### 2. $and、$or、$nor、$not
 
 ##### a）最外层(尚没有具体属性)逻辑连接
 
