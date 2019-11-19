@@ -204,7 +204,7 @@ export class ListFilterPipe implements PipeTransform {
             return target;
         }
 
-        return deepExtend(src, target);
+        return deepExtend(target, src);
     }
 
     private static replaceFilterImage(target: any, map: { key: string, value: any }) {
